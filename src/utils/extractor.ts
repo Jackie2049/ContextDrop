@@ -222,25 +222,53 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractDoubaoMessages(): Message[] {
     const messages: Message[] = [];
 
-    // Find all message blocks
-    const messageBlocks = document.querySelectorAll('[class*="message-block-container"]');
+    // 尝试多种选择器找到消息块
+    const selectors = [
+      '[class*="message-block-container"]',
+      '[class*="message-block"]',
+      '[class*="chat-message"]',
+      '[class*="message-item"]',
+      '[class*="msg-container"]',
+    ];
+
+    let messageBlocks: NodeListOf<Element> | Element[] = [];
+    for (const selector of selectors) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        messageBlocks = elements;
+        console.log(`[OmniContext] Found ${elements.length} message blocks with: ${selector}`);
+        break;
+      }
+    }
+
+    if (messageBlocks.length === 0) {
+      console.warn('[OmniContext] No message blocks found, trying fallback extraction');
+      return this.extractMessagesFromDocument();
+    }
 
     messageBlocks.forEach((block, index) => {
+      const fullText = block.textContent || '';
+      console.log(`[OmniContext] Block ${index}: "${fullText.substring(0, 50)}..."`);
+
       // 多重检测用户消息的方式
       // 1. 检查 bg-s-color-bg-trans 类（豆包用户消息标志）
       const hasUserClass = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
 
       // 2. 检查是否有助手特有的元素（头像、thinking等）
-      const hasAssistantAvatar = !!block.querySelector('[class*="avatar"], [class*="bot-avatar"], [class*="ai-avatar"], img[src*="avatar"]');
+      const hasAssistantAvatar = !!block.querySelector('[class*="avatar"], [class*="bot-avatar"], [class*="ai-avatar"], img');
       const hasThinkingSection = !!block.querySelector('[class*="thinking"], [class*="thought"], [class*="reasoning"]');
 
       // 3. 根据内容特征判断
-      const fullText = block.textContent || '';
       const hasAssistantMarkers = fullText.includes('已完成思考') ||
                                    fullText.includes('思考过程') ||
                                    fullText.includes('让我来') ||
                                    fullText.includes('我来帮你') ||
-                                   fullText.includes('我来分析');
+                                   fullText.includes('我来分析') ||
+                                   fullText.includes('好的') ||
+                                   fullText.includes('以下是') ||
+                                   fullText.length > 200; // 助手回复通常较长
+
+      console.log(`[OmniContext] Block ${index}: hasUserClass=${hasUserClass}, hasAssistantAvatar=${hasAssistantAvatar}, hasThinkingSection=${hasThinkingSection}, hasAssistantMarkers=${hasAssistantMarkers}`);
 
       // 综合判断：如果有助手特征，则不是用户消息
       const isUserMessage = hasUserClass && !hasAssistantAvatar && !hasThinkingSection && !hasAssistantMarkers;
@@ -249,8 +277,10 @@ class PlatformMessageExtractor implements MessageExtractor {
         // User message - extract normally
         const contentElement = block.querySelector('[class*="container-"]') ||
                                block.querySelector('[class*="message-content"]') ||
+                               block.querySelector('[class*="content"]') ||
                                block;
         const content = this.extractTextContent(contentElement);
+        console.log(`[OmniContext] Block ${index} -> USER: "${content?.substring(0, 50)}..."`);
         if (content && content.length > 0) {
           messages.push({
             id: `doubao-msg-${index}`,
@@ -260,37 +290,20 @@ class PlatformMessageExtractor implements MessageExtractor {
           });
         }
       } else {
-        // Assistant message - need to distinguish thinking from final answer
-        // Try to find final answer first (usually after thinking section)
-        const finalAnswerElement = block.querySelector('[class*="answer-content"], [class*="final-answer"], [class*="message-content"]:last-child');
-
-        if (finalAnswerElement) {
-          const content = this.extractTextContent(finalAnswerElement);
-          if (content && content.length > 0 && !content.includes('思考中')) {
-            messages.push({
-              id: `doubao-msg-${index}`,
-              role: 'assistant',
-              content,
-              timestamp: Date.now(),
-            });
-            return;
-          }
-        }
-
-        // Fallback: extract all text but filter out thinking section
+        // Assistant message
         const contentElement = block.querySelector('[class*="container-"]') ||
                                block.querySelector('[class*="message-content"]') ||
+                               block.querySelector('[class*="content"]') ||
                                block;
-        if (contentElement) {
-          const content = this.extractDoubaoAssistantContent(contentElement);
-          if (content && content.length > 0) {
-            messages.push({
-              id: `doubao-msg-${index}`,
-              role: 'assistant',
-              content,
-              timestamp: Date.now(),
-            });
-          }
+        const content = this.extractDoubaoAssistantContent(contentElement);
+        console.log(`[OmniContext] Block ${index} -> ASSISTANT: "${content?.substring(0, 50)}..."`);
+        if (content && content.length > 0) {
+          messages.push({
+            id: `doubao-msg-${index}`,
+            role: 'assistant',
+            content,
+            timestamp: Date.now(),
+          });
         }
       }
     });
