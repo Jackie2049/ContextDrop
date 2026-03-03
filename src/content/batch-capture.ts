@@ -231,11 +231,47 @@ export class BatchCapture {
         // 点击会话
         await this.clickSession(element);
 
+        // 检查取消
+        if (this.isCancelled) {
+          this.reportProgress({
+            total,
+            current: captured,
+            currentTitle: '',
+            captured: this.totalCaptured,
+            status: 'cancelled',
+          });
+          return;
+        }
+
         // 等待加载
         await this.waitForSessionLoad();
 
+        // 检查取消
+        if (this.isCancelled) {
+          this.reportProgress({
+            total,
+            current: captured,
+            currentTitle: '',
+            captured: this.totalCaptured,
+            status: 'cancelled',
+          });
+          return;
+        }
+
         // 滚动加载历史，获取消息总数
         const sessionMessageTotal = await this.scrollToLoadHistory();
+
+        // 检查取消
+        if (this.isCancelled) {
+          this.reportProgress({
+            total,
+            current: captured,
+            currentTitle: '',
+            captured: this.totalCaptured,
+            status: 'cancelled',
+          });
+          return;
+        }
 
         // 报告进度：正在捕获（显示消息数）
         this.reportProgress({
@@ -1148,9 +1184,15 @@ export class BatchCapture {
     let noChangeCount = 0;
     let messageCount = this.countDoubaoMessages(root);
 
-    while (noChangeCount < 3) {
+    while (noChangeCount < 3 && !this.isCancelled) {
       (scrollTarget as HTMLElement).scrollTop = 0;
       await this.sleep(500);
+
+      // 检查取消
+      if (this.isCancelled) {
+        console.log('[OmniContext] Scroll cancelled');
+        return messageCount;
+      }
 
       if (scrollTarget.scrollHeight === lastHeight) {
         noChangeCount++;
