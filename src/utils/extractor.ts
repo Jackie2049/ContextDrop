@@ -377,13 +377,11 @@ class PlatformMessageExtractor implements MessageExtractor {
     // 2. Find the final answer
     // 3. Include BOTH thinking and answer in the captured content
 
-    // Look for thinking section elements
+    // Doubao thinking block selectors based on actual DOM structure
     const thinkingSelectors = [
-      '[class*="thinking"]',
-      '[class*="thought"]',
-      '[class*="reasoning"]',
-      '[class*="think-mode"]',
-      '[class*="deep-think"]',
+      '[data-testid="think_block_expand"]',
+      '[class*="think-block-container"]',
+      '[class*="collapse-quota-block"]',
     ];
 
     let thinkingContent = '';
@@ -393,42 +391,63 @@ class PlatformMessageExtractor implements MessageExtractor {
     for (const selector of thinkingSelectors) {
       const thinkingEl = element.querySelector(selector);
       if (thinkingEl) {
-        thinkingContent = this.extractTextContent(thinkingEl).trim();
-        if (thinkingContent) break;
+        // Extract text from thinking block, excluding the "已完成思考" prefix text
+        const contentEl = thinkingEl.querySelector('[class*="container-"]') ||
+                          thinkingEl.querySelector('[data-testid="message_text_content"]') ||
+                          thinkingEl;
+        const rawContent = this.extractTextContent(contentEl).trim();
+
+        // Only use if there's actual content beyond the prefix
+        if (rawContent.length > 20 && !rawContent.match(/^已完成思考\s*$/)) {
+          thinkingContent = rawContent;
+          break;
+        }
       }
     }
 
-    // Extract all content first
+    // Extract all content from element
     const allContent = this.extractTextContent(element).trim();
 
-    // If we found thinking content, separate it from the answer
+    // If we found thinking content, format it
     if (thinkingContent && thinkingContent.length > 10) {
       // Clean up thinking content - remove common prefixes
       thinkingContent = thinkingContent
-        .replace(/^思考中[\.。。\s]*/i, '')
-        .replace(/^thinking[\.。。\s]*/i, '')
-        .replace(/^思考过程[：:\s]*/i, '')
-        .replace(/^已完成思考[：:\s]*/i, '')
+        .replace(/^已完成思考[\s\n]*/i, '')
+        .replace(/^思考中[\.。。\s\n]*/i, '')
+        .replace(/^thinking[\.。。\s\n]*/i, '')
+        .replace(/^思考过程[：:\s\n]*/i, '')
         .trim();
 
-      // Try to find answer content by removing thinking part from full content
-      // This handles cases where thinking is embedded in the same container
-      if (allContent.includes(thinkingContent)) {
-        // Find content after thinking section
+      // Find answer content (content after thinking block)
+      // Try to get content from outside the thinking block
+      const thinkingBlock = element.querySelector('[data-testid="think_block_expand"]') ||
+                           element.querySelector('[class*="collapse-quota-block"]');
+
+      if (thinkingBlock) {
+        // Get all text content excluding the thinking block
+        const clone = element.cloneNode(true) as Element;
+        const thinkingInClone = clone.querySelector('[data-testid="think_block_expand"]') ||
+                                clone.querySelector('[class*="collapse-quota-block"]');
+        if (thinkingInClone) {
+          thinkingInClone.remove();
+        }
+        answerContent = this.extractTextContent(clone).trim();
+      }
+
+      // Fallback: if we couldn't separate, use substring approach
+      if (!answerContent && allContent.includes(thinkingContent)) {
         const thinkingIndex = allContent.indexOf(thinkingContent);
         if (thinkingIndex !== -1) {
-          const afterThinking = allContent.substring(thinkingIndex + thinkingContent.length).trim();
-          // Skip common separators
-          answerContent = afterThinking
+          answerContent = allContent.substring(thinkingIndex + thinkingContent.length)
             .replace(/^[\n\r]+/, '')
             .replace(/^(正式回答|回答|最终答案)[：:]\s*/i, '')
             .trim();
         }
       }
 
-      // If we couldn't separate, use the full content as answer
-      if (!answerContent) {
-        answerContent = allContent;
+      // If still no answer, use all content as fallback
+      if (!answerContent || answerContent.length < 5) {
+        answerContent = allContent.replace(thinkingContent, '').trim();
       }
 
       // Return combined format with thinking included
