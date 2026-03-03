@@ -375,93 +375,88 @@ class PlatformMessageExtractor implements MessageExtractor {
     // For Doubao with thinking mode, we want to:
     // 1. Find thinking content (if present)
     // 2. Find the final answer
-    // 3. Include BOTH thinking and answer in the captured content
+    // 3. Include BOTH, with <deep-thinking> tags around thinking content
 
-    // Doubao thinking block selectors based on actual DOM structure
-    const thinkingSelectors = [
-      '[data-testid="think_block_expand"]',
-      '[class*="think-block-container"]',
-      '[class*="collapse-quota-block"]',
-    ];
+    // Find thinking block
+    const thinkingBlock = element.querySelector('[data-testid="think_block_expand"]') ||
+                          element.querySelector('[class*="think-block-container"]');
 
     let thinkingContent = '';
     let answerContent = '';
 
-    // Try to find thinking content
-    for (const selector of thinkingSelectors) {
-      const thinkingEl = element.querySelector(selector);
-      if (thinkingEl) {
-        // Extract text from thinking block, excluding the "已完成思考" prefix text
-        const contentEl = thinkingEl.querySelector('[class*="container-"]') ||
-                          thinkingEl.querySelector('[data-testid="message_text_content"]') ||
-                          thinkingEl;
-        const rawContent = this.extractTextContent(contentEl).trim();
+    if (thinkingBlock) {
+      // Extract thinking content
+      const contentEl = thinkingBlock.querySelector('[data-testid="message_text_content"]') ||
+                        thinkingBlock.querySelector('[class*="container-"]') ||
+                        thinkingBlock;
+      thinkingContent = this.extractTextContent(contentEl).trim();
 
-        // Only use if there's actual content beyond the prefix
-        if (rawContent.length > 20 && !rawContent.match(/^已完成思考\s*$/)) {
-          thinkingContent = rawContent;
-          break;
+      // Clean up thinking content - remove common prefixes
+      thinkingContent = thinkingContent
+        .replace(/^已完成思考[\s\n]*/, '')
+        .replace(/^思考中[\.。。\s\n]*/, '')
+        .trim();
+
+      // Extract answer content: look for other content containers in the message
+      // Answer usually comes after thinking block in the DOM
+      const allTextContainers = element.querySelectorAll('[data-testid="message_text_content"]');
+      let foundThinking = false;
+
+      for (const container of allTextContainers) {
+        // Skip the thinking container
+        if (thinkingBlock.contains(container)) {
+          foundThinking = true;
+          continue;
+        }
+
+        // This should be the answer container
+        if (foundThinking || !thinkingBlock.contains(container)) {
+          const text = this.extractTextContent(container).trim();
+          if (text && text.length > 5 && text !== thinkingContent) {
+            answerContent = text;
+            break;
+          }
+        }
+      }
+
+      // Fallback: use substring approach to find answer after thinking
+      if (!answerContent) {
+        const allContent = this.extractTextContent(element).trim();
+        // Find content after "已完成思考" or after thinking content
+        const markers = ['已完成思考', thinkingContent];
+        for (const marker of markers) {
+          if (marker && allContent.includes(marker)) {
+            const idx = allContent.lastIndexOf(marker);
+            if (idx !== -1) {
+              const after = allContent.substring(idx + marker.length).trim();
+              if (after.length > 5) {
+                answerContent = after;
+                break;
+              }
+            }
+          }
         }
       }
     }
 
-    // Extract all content from element
-    const allContent = this.extractTextContent(element).trim();
-
-    // If we found thinking content, format it
+    // Format output with <deep-thinking> tags
     if (thinkingContent && thinkingContent.length > 10) {
-      // Clean up thinking content - remove common prefixes
-      thinkingContent = thinkingContent
-        .replace(/^已完成思考[\s\n]*/i, '')
-        .replace(/^思考中[\.。。\s\n]*/i, '')
-        .replace(/^thinking[\.。。\s\n]*/i, '')
-        .replace(/^思考过程[：:\s\n]*/i, '')
-        .trim();
-
-      // Find answer content (content after thinking block)
-      // Try to get content from outside the thinking block
-      const thinkingBlock = element.querySelector('[data-testid="think_block_expand"]') ||
-                           element.querySelector('[class*="collapse-quota-block"]');
-
-      if (thinkingBlock) {
-        // Get all text content excluding the thinking block
-        const clone = element.cloneNode(true) as Element;
-        const thinkingInClone = clone.querySelector('[data-testid="think_block_expand"]') ||
-                                clone.querySelector('[class*="collapse-quota-block"]');
-        if (thinkingInClone) {
-          thinkingInClone.remove();
-        }
-        answerContent = this.extractTextContent(clone).trim();
-      }
-
-      // Fallback: if we couldn't separate, use substring approach
-      if (!answerContent && allContent.includes(thinkingContent)) {
-        const thinkingIndex = allContent.indexOf(thinkingContent);
-        if (thinkingIndex !== -1) {
-          answerContent = allContent.substring(thinkingIndex + thinkingContent.length)
-            .replace(/^[\n\r]+/, '')
-            .replace(/^(正式回答|回答|最终答案)[：:]\s*/i, '')
-            .trim();
-        }
-      }
-
-      // If still no answer, use all content as fallback
-      if (!answerContent || answerContent.length < 5) {
-        answerContent = allContent.replace(thinkingContent, '').trim();
-      }
-
-      // Return combined format with thinking included
-      if (thinkingContent && answerContent && thinkingContent !== answerContent) {
-        return `【思考过程】
+      if (answerContent && answerContent.length > 5) {
+        return `<deep-thinking>
 ${thinkingContent}
+</deep-thinking>
 
-【回答】
 ${answerContent}`;
+      } else {
+        // Only thinking content found, return as-is with tags
+        return `<deep-thinking>
+${thinkingContent}
+</deep-thinking>`;
       }
     }
 
     // No thinking content found, return all content
-    return allContent;
+    return this.extractTextContent(element).trim();
   }
 
   private extractYuanbaoMessages(): Message[] {
