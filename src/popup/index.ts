@@ -26,6 +26,7 @@ function getPlatformIcon(platform: Platform, options: IconOptions = {}): string 
     doubao: chrome.runtime.getURL('icons/platforms/doubao.svg'),
     yuanbao: chrome.runtime.getURL('icons/platforms/yuanbao.svg'),
     claude: chrome.runtime.getURL('icons/platforms/claude.svg'),
+    deepseek: chrome.runtime.getURL('icons/platforms/deepseek.svg'),
   };
   const style = extraStyle ? ` style="${extraStyle}"` : '';
   return `<img class="${className} ${platform}" src="${iconUrls[platform]}" width="${size}" height="${size}" alt="${formatPlatformName(platform)}"${style}>`;
@@ -35,6 +36,7 @@ const PLATFORM_ICONS: Record<Platform, string> = {
   doubao: getPlatformIcon('doubao'),
   yuanbao: getPlatformIcon('yuanbao'),
   claude: getPlatformIcon('claude'),
+  deepseek: getPlatformIcon('deepseek'),
 };
 
 // DOM Elements
@@ -1065,9 +1067,10 @@ async function handleBatchCaptureStart() {
   // Check if already running locally
   if (isBatchCapturing) {
     const platformNames: Record<Platform, string> = {
-      doubao: '豆包',
+          doubao: '豆包',
       yuanbao: '元宝',
       claude: 'Claude',
+      deepseek: 'DeepSeek',
     };
     showToast(`正在批量捕获 ${platformNames[currentPlatform] || currentPlatform} 的会话`);
     return;
@@ -1081,6 +1084,7 @@ async function handleBatchCaptureStart() {
         doubao: '豆包',
         yuanbao: '元宝',
         claude: 'Claude',
+        deepseek: 'DeepSeek',
       };
       const lockedPlatform = platformNames[lockCheck.platform] || lockCheck.platform;
       showToast(`请先完成 ${lockedPlatform} 的批量捕获`);
@@ -1112,16 +1116,20 @@ async function handleBatchCaptureStart() {
     console.error('Failed to acquire batch capture lock:', err);
   }
 
-  // 元宝平台特殊提示
-  if (currentPlatform === 'yuanbao') {
+  // 元宝和 DeepSeek 平台特殊提示：需要先打开会话列表
+  if (currentPlatform === 'yuanbao' || currentPlatform === 'deepseek') {
     // 先检查会话列表是否可见
     try {
       const checkResponse = await chrome.tabs.sendMessage(tab.id, { type: 'BATCH_CAPTURE_CHECK_SIDEBAR' });
       if (!checkResponse.sidebarVisible) {
         // 释放锁
         await chrome.runtime.sendMessage({ type: 'BATCH_CAPTURE_RELEASE_LOCK' });
-        // 显示友好提示（强调在元宝页面操作）
-        showToast('💡 请在元宝页面中点击左侧菜单栏打开元宝的会话列表，OmniContext才能捕获到会话哦~');
+        // 显示友好提示
+        if (currentPlatform === 'yuanbao') {
+          showToast('💡 请在元宝页面中点击左侧菜单栏打开元宝的会话列表，OmniContext才能捕获到会话哦~');
+        } else {
+          showToast('💡 请在 DeepSeek 页面中点击左上角菜单按钮打开会话历史列表，OmniContext才能捕获到会话哦~');
+        }
         return;
       }
     } catch (err) {
@@ -1143,9 +1151,11 @@ async function handleBatchCaptureStart() {
     } else {
       // 获取失败，释放锁
       await chrome.runtime.sendMessage({ type: 'BATCH_CAPTURE_RELEASE_LOCK' });
-      // 针对元宝"未找到会话列表"显示特殊提示
+      // 针对元宝/DeepSeek"未找到会话列表"显示特殊提示
       if (currentPlatform === 'yuanbao' && response.error?.includes('未找到会话列表')) {
         showToast('💡 请在元宝页面中点击左侧菜单栏打开元宝的会话列表，OmniContext才能捕获到会话哦~');
+      } else if (currentPlatform === 'deepseek' && response.error?.includes('未找到会话列表')) {
+        showToast('💡 请在 DeepSeek 页面中点击左上角菜单按钮打开会话历史列表，OmniContext才能捕获到会话哦~');
       } else {
         showToast(response.error || '启动失败');
       }
@@ -1201,6 +1211,7 @@ function updateBatchCaptureProgress(progress: {
         doubao: '豆包',
         yuanbao: '元宝',
         claude: 'Claude',
+        deepseek: 'DeepSeek',
       };
       batchScanningPlatform.textContent = platformNames[currentPlatform] || currentPlatform;
     }

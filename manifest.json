@@ -10,7 +10,8 @@
   "host_permissions": [
     "https://www.doubao.com/*",
     "https://yuanbao.tencent.com/*",
-    "https://claude.ai/*"
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",
@@ -25,7 +26,8 @@
       "matches": [
         "https://www.doubao.com/*",
         "https://yuanbao.tencent.com/*",
-        "https://claude.ai/*"
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"

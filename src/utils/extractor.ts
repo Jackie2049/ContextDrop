@@ -62,6 +62,23 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
       assistant: '.assistant-message, .message.assistant, [data-testid="assistant-message"], [class*="assistant"], [class*="claude-message"]',
     },
   },
+  deepseek: {
+    hostname: 'chat.deepseek.com',
+    titleSelectors: [
+      'title',
+      '[class*="chat-title"]',
+      '[class*="conversation-title"]',
+      '[class*="session-title"]',
+      'h1',
+    ],
+    messageSelectors: {
+      // DeepSeek uses CSS Modules with hashed class names
+      // ds-message is the stable part, user messages have additional class d29f3d7d
+      container: '[class*="ds-scroll-area"], main, [class*="chat-container"]',
+      user: '[class*="ds-message"][class*="d29f3d7d"], [class*="ds-chat-message--user"]',
+      assistant: '[class*="ds-message"]:not([class*="d29f3d7d"]), [class*="ds-chat-message--assistant"]',
+    },
+  },
 };
 
 export function detectPlatform(url: string): Platform | null {
@@ -70,6 +87,7 @@ export function detectPlatform(url: string): Platform | null {
   if (hostname.includes('doubao.com')) return 'doubao';
   if (hostname.includes('yuanbao.tencent.com')) return 'yuanbao';
   if (hostname.includes('claude.ai')) return 'claude';
+  if (hostname.includes('deepseek.com')) return 'deepseek';
 
   return null;
 }
@@ -103,6 +121,26 @@ export function extractSessionId(url: string, platform: Platform): string {
     // This fallback will be overridden by extractSessionIdFromDOM in content script
     // Use a timestamp-based ID to avoid collisions during initial load
     console.warn('[OmniContext] Yuanbao session ID not found in URL, will extract from DOM');
+  }
+
+  // DeepSeek: URL format is /a/chat/s/{sessionId}
+  if (platform === 'deepseek') {
+    // Look for the session ID after '/s/' in the path
+    const sIndex = pathParts.indexOf('s');
+    if (sIndex !== -1 && sIndex + 1 < pathParts.length) {
+      const sessionId = pathParts[sIndex + 1];
+      if (sessionId && sessionId.length >= 4) {
+        return sessionId;
+      }
+    }
+
+    // Fallback: look for any UUID-like segment
+    for (const part of pathParts) {
+      // DeepSeek session IDs are typically UUIDs or long alphanumeric strings
+      if (part && part.length >= 8 && /^[a-zA-Z0-9_-]+$/.test(part)) {
+        return part;
+      }
+    }
   }
 
   // Default: try to find UUID or ID in path
@@ -207,6 +245,7 @@ export function formatPlatformName(platform: Platform): string {
     doubao: '豆包',
     yuanbao: '元宝',
     claude: 'Claude',
+    deepseek: 'DeepSeek',
   };
   return names[platform];
 }
@@ -255,6 +294,10 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     if (this.platform === 'claude') {
       return this.extractClaudeMessages();
+    }
+
+    if (this.platform === 'deepseek') {
+      return this.extractDeepseekMessages();
     }
 
     const messages: Message[] = [];
@@ -857,6 +900,207 @@ class PlatformMessageExtractor implements MessageExtractor {
     }
 
     return cleaned.trim();
+  }
+
+  private extractDeepseekMessages(): Message[] {
+    const messages: Message[] = [];
+
+    console.log('[OmniContext] Extracting DeepSeek messages...');
+
+    // DeepSeek uses CSS Modules with hashed class names
+    // User messages: have class pattern like "d29f3d7d ds-message _63c77b1"
+    // Assistant messages: have class "ds-message _63c77b1" (without the user hash)
+    // Thinking content: has class "ds-think-content"
+
+    // Find all ds-message elements (this is the stable part of the class name)
+    const allMessages = document.querySelectorAll('[class*="ds-message"]');
+    console.log(`[OmniContext] Found ${allMessages.length} ds-message elements`);
+
+    if (allMessages.length === 0) {
+      // Fallback: try broader selectors
+      return this.extractDeepseekFromDocument();
+    }
+
+    allMessages.forEach((msgEl, index) => {
+      const className = msgEl.className || '';
+      const fullText = msgEl.textContent || '';
+
+      console.log(`[OmniContext] [${index}] class="${className}" text="${fullText.slice(0, 50)}..."`);
+
+      // Check if this is a user message
+      // User messages typically have an additional class that assistant messages don't have
+      // The hash "d29f3d7d" appears to be the user identifier
+      // We also check if the element contains thinking content (only assistant has this)
+      const hasThinkingContent = !!msgEl.querySelector('[class*="ds-think-content"]');
+      const hasUserClass = className.includes('d29f3d7d') ||
+                          className.includes('ds-chat-message--user') ||
+                          msgEl.hasAttribute('data-user');
+
+      // If no thinking content and has user class pattern, it's a user message
+      // Assistant messages: have thinking or are longer and don't have user markers
+      const isUserMessage = hasUserClass && !hasThinkingContent;
+
+      if (isUserMessage) {
+        const content = this.extractDeepseekUserContent(msgEl);
+        if (content) {
+          messages.push({
+            id: `deepseek-msg-${index}`,
+            role: 'user',
+            content,
+            timestamp: Date.now(),
+          });
+          console.log(`[OmniContext] [${index}] USER: "${content.slice(0, 50)}..."`);
+        }
+      } else {
+        const content = this.extractDeepseekAssistantContent(msgEl);
+        if (content) {
+          messages.push({
+            id: `deepseek-msg-${index}`,
+            role: 'assistant',
+            content,
+            timestamp: Date.now(),
+          });
+          console.log(`[OmniContext] [${index}] ASSISTANT: "${content.slice(0, 50)}..."`);
+        }
+      }
+    });
+
+    console.log(`[OmniContext] Extracted ${messages.length} DeepSeek messages`);
+    return messages;
+  }
+
+  private extractDeepseekFromDocument(): Message[] {
+    const messages: Message[] = [];
+
+    console.log('[OmniContext] Trying DeepSeek fallback extraction...');
+
+    // Fallback: look for common message patterns
+    const containerSelectors = [
+      '[class*="ds-scroll-area"]',
+      '[class*="chat-container"]',
+      '[class*="conversation"]',
+      'main',
+    ];
+
+    let container: Element | null = null;
+    for (const selector of containerSelectors) {
+      container = document.querySelector(selector);
+      if (container) {
+        console.log(`[OmniContext] Found container with: ${selector}`);
+        break;
+      }
+    }
+
+    if (!container) {
+      container = document.body;
+    }
+
+    // Look for all elements that might be messages
+    const allDivs = container.querySelectorAll('div');
+    const messageCandidates: Array<{ el: Element; score: number }> = [];
+
+    allDivs.forEach(div => {
+      const className = (div.className || '').toLowerCase();
+      const text = div.textContent || '';
+      const children = div.children.length;
+
+      // Score based on message-like characteristics
+      let score = 0;
+
+      // Has message-related class
+      if (className.includes('message') || className.includes('ds-message')) score += 3;
+      if (className.includes('chat')) score += 2;
+      if (className.includes('bubble')) score += 2;
+
+      // Appropriate length (not too short, not container)
+      if (text.length >= 5 && text.length <= 5000) score += 1;
+      if (text.length > 100 && text.length < 2000) score += 1;
+
+      // Not too many children (leaf-ish elements)
+      if (children <= 3) score += 1;
+
+      if (score >= 3) {
+        messageCandidates.push({ el: div, score });
+      }
+    });
+
+    // Sort by score and take top candidates
+    messageCandidates.sort((a, b) => b.score - a.score);
+    const topCandidates = messageCandidates.slice(0, 50);
+
+    console.log(`[OmniContext] Found ${topCandidates.length} message candidates`);
+
+    // Try to determine role based on position and content
+    topCandidates.forEach(({ el }, index) => {
+      const className = el.className || '';
+      const text = el.textContent?.trim() || '';
+
+      // User messages usually appear first and are shorter
+      // This is a rough heuristic
+      const isUserMessage = className.includes('user') ||
+                           className.includes('human') ||
+                           (text.length < 200 && index % 2 === 0);
+
+      if (text.length > 0) {
+        messages.push({
+          id: `deepseek-fallback-msg-${index}`,
+          role: isUserMessage ? 'user' : 'assistant',
+          content: text,
+          timestamp: Date.now(),
+        });
+      }
+    });
+
+    return messages;
+  }
+
+  private extractDeepseekUserContent(element: Element): string {
+    // Try to find the main content container
+    const contentSelectors = [
+      '[class*="content"]',
+      '[class*="text"]',
+      '.ds-message-content',
+      'p',
+    ];
+
+    for (const selector of contentSelectors) {
+      const contentEl = element.querySelector(selector);
+      if (contentEl?.textContent?.trim()) {
+        const text = contentEl.textContent.trim();
+        // Make sure it's not the entire message text
+        if (text.length < element.textContent!.length * 0.9) {
+          return text;
+        }
+      }
+    }
+
+    // Fallback: use element's direct text
+    return element.textContent?.trim() || '';
+  }
+
+  private extractDeepseekAssistantContent(element: Element): string {
+    // DeepSeek has thinking content in ds-think-content class
+    // We exclude thinking content to be consistent with Yuanbao and Doubao
+
+    // Get the main content (excluding thinking)
+    const clone = element.cloneNode(true) as Element;
+
+    // Remove thinking content elements
+    const thinkingElements = clone.querySelectorAll('[class*="ds-think-content"], [class*="think-content"], [class*="thinking"]');
+    thinkingElements.forEach(el => el.remove());
+
+    // Also remove any elements with thinking-related class names
+    const thinkingPatterns = ['think', 'reasoning', 'thought'];
+    const allElements = clone.querySelectorAll('*');
+    allElements.forEach(el => {
+      const className = (el.className || '').toLowerCase();
+      if (thinkingPatterns.some(p => className.includes(p))) {
+        el.remove();
+      }
+    });
+
+    const mainText = clone.textContent?.trim() || '';
+    return mainText;
   }
 
   private extractMessagesFromDocument(): Message[] {

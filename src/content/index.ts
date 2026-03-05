@@ -3,7 +3,7 @@ import { detectPlatform, extractSessionId, extractSessionIdFromDOM, createMessag
 import { startBatchCapture, pauseBatchCapture, resumeBatchCapture, cancelBatchCapture, isBatchCaptureRunning, getBatchCaptureProgress, setSelectedSessions } from './batch-capture';
 import type { Platform, Session, Message } from '../types';
 
-const DEBUG = false;  // Disable verbose logging
+const DEBUG = true;  // Enable verbose logging for DeepSeek debugging
 
 function log(...args: any[]) {
   if (DEBUG) console.log('[OmniContext]', ...args);
@@ -46,6 +46,17 @@ function init() {
       return;
     }
 
+    // DeepSeek 专用调试
+    if (currentPlatform === 'deepseek') {
+      console.log('[OmniContext] === DeepSeek Debug Start ===');
+      console.log('[OmniContext] URL:', url);
+
+      // 分析页面结构
+      setTimeout(() => {
+        debugDeepSeekPage();
+      }, 2000);
+    }
+
     // First try URL-based extraction
     currentSessionId = extractSessionId(url, currentPlatform);
 
@@ -68,6 +79,92 @@ function init() {
   } catch (err) {
     console.error('[OmniContext] Init failed:', err);
   }
+}
+
+// DeepSeek 专用调试函数
+function debugDeepSeekPage() {
+  console.log('[OmniContext] === DeepSeek DOM Analysis ===');
+
+  // 1. 检查主要容器
+  const mainSelectors = ['main', '[class*="main"]', '[class*="chat"]', '[class*="conversation"]', '[class*="ds-scroll-area"]'];
+  for (const sel of mainSelectors) {
+    const els = document.querySelectorAll(sel);
+    if (els.length > 0) {
+      console.log(`[OmniContext] Found ${els.length} elements with: ${sel}`);
+    }
+  }
+
+  // 2. 检查消息元素
+  console.log('[OmniContext] --- Looking for message elements ---');
+  const allDivs = document.querySelectorAll('div');
+  const candidates: Element[] = [];
+
+  allDivs.forEach(div => {
+    const text = div.textContent?.trim() || '';
+    const classList = div.className || '';
+
+    // 消息元素通常有这些特征
+    if (text.length > 10 && text.length < 2000) {
+      // 检查是否可能是消息
+      const hasMessageClass = classList.toLowerCase().includes('message') ||
+                              classList.toLowerCase().includes('chat') ||
+                              classList.toLowerCase().includes('bubble') ||
+                              classList.toLowerCase().includes('content');
+
+      if (hasMessageClass && div.children.length < 5) {
+        candidates.push(div);
+      }
+    }
+  });
+
+  console.log(`[OmniContext] Found ${candidates.length} potential message elements`);
+  candidates.slice(0, 5).forEach((el, i) => {
+    console.log(`[OmniContext] [${i}] class="${el.className}"`);
+    console.log(`[OmniContext]     text="${el.textContent?.slice(0, 100)}..."`);
+  });
+
+  // 3. 检查侧边栏
+  console.log('[OmniContext] --- Looking for sidebar ---');
+  const sidebarSelectors = ['nav', 'aside', '[class*="sidebar"]', '[class*="history"]', '[class*="session"]'];
+  for (const sel of sidebarSelectors) {
+    const el = document.querySelector(sel);
+    if (el) {
+      console.log(`[OmniContext] Sidebar found with: ${sel}`);
+      console.log(`[OmniContext]   classes: ${el.className}`);
+      console.log(`[OmniContext]   children: ${el.children.length}`);
+    }
+  }
+
+  // 4. 输出所有 ds- 开头的 class
+  console.log('[OmniContext] --- ds- prefixed classes ---');
+  const dsElements = document.querySelectorAll('[class*="ds-"]');
+  const dsClasses = new Set<string>();
+  dsElements.forEach(el => {
+    const classes = el.className.split(/\s+/);
+    classes.forEach(c => {
+      if (c.startsWith('ds-')) dsClasses.add(c);
+    });
+  });
+  console.log('[OmniContext] ds- classes:', Array.from(dsClasses).slice(0, 20));
+
+  // 5. 尝试提取消息
+  console.log('[OmniContext] --- Trying message extraction ---');
+  try {
+    const extractor = createMessageExtractor('deepseek');
+    const title = extractor.extractTitle();
+    const messages = extractor.extractMessages();
+    console.log(`[OmniContext] Title: "${title}"`);
+    console.log(`[OmniContext] Messages: ${messages.length}`);
+    if (messages.length > 0) {
+      messages.slice(0, 3).forEach((m, i) => {
+        console.log(`[OmniContext] [${i}] ${m.role}: "${m.content.slice(0, 50)}..."`);
+      });
+    }
+  } catch (e) {
+    console.error('[OmniContext] Extraction error:', e);
+  }
+
+  console.log('[OmniContext] === DeepSeek Debug End ===');
 }
 
 function startCapturing() {
@@ -276,6 +373,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sessionList &&
         sessionItems.length > 0);
 
+      sendResponse({ sidebarVisible });
+    } else if (currentPlatform === 'deepseek') {
+      // 检查 DeepSeek 会话列表是否可见
+      // DeepSeek 会话链接格式: /a/chat/s/{sessionId}
+      const sessionLinks = document.querySelectorAll('a[href*="/chat/s/"]');
+      let visibleCount = 0;
+
+      sessionLinks.forEach(link => {
+        // 检查链接是否可见（在视口内且有尺寸）
+        const rect = link.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          visibleCount++;
+        }
+      });
+
+      // 如果有至少1个可见的会话链接，就认为侧边栏已打开
+      const sidebarVisible = visibleCount > 0;
+
+      console.log(`[OmniContext] DeepSeek sidebar check: ${sessionLinks.length} links, ${visibleCount} visible, result: ${sidebarVisible}`);
       sendResponse({ sidebarVisible });
     } else {
       // 其他平台默认返回 true

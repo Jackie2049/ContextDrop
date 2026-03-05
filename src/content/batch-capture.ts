@@ -179,6 +179,12 @@ export class BatchCapture {
       return;
     }
 
+    // DeepSeek 特殊处理：使用 URL 导航而不是点击
+    if (this.platform === 'deepseek') {
+      await this.captureDeepseekSessions();
+      return;
+    }
+
     let captured = 0;
     let newCount = 0;      // 新捕获的会话数
     let updatedCount = 0;  // 更新的会话数
@@ -638,6 +644,7 @@ export class BatchCapture {
       doubao: '豆包',
       yuanbao: '元宝',
       claude: 'Claude',
+      deepseek: 'DeepSeek',
     };
     return names[platform] || platform;
   }
@@ -664,6 +671,9 @@ export class BatchCapture {
     if (this.platform === 'yuanbao') {
       return this.getYuanbaoSessionListElements();
     }
+    if (this.platform === 'deepseek') {
+      return this.getDeepseekSessionListElements();
+    }
     // 其他平台待实现
     return [];
   }
@@ -675,6 +685,9 @@ export class BatchCapture {
     if (this.platform === 'yuanbao') {
       return this.getYuanbaoSessionTitle(element);
     }
+    if (this.platform === 'deepseek') {
+      return this.getDeepseekSessionTitle(element);
+    }
     return '未知会话';
   }
 
@@ -684,6 +697,9 @@ export class BatchCapture {
     }
     if (this.platform === 'yuanbao') {
       return this.getYuanbaoSessionIdFromElement(element);
+    }
+    if (this.platform === 'deepseek') {
+      return this.getDeepseekSessionIdFromElement(element);
     }
     return null;
   }
@@ -782,6 +798,29 @@ export class BatchCapture {
         console.log('[OmniContext] Clicking Yuanbao session element directly');
         (element as HTMLElement).click();
       }
+    } else if (this.platform === 'deepseek') {
+      // DeepSeek: 会话是链接，点击前记录当前 URL
+      const currentUrl = window.location.href;
+      const href = element.getAttribute('href') || '';
+      console.log('[OmniContext] DeepSeek: Clicking session with href:', href);
+
+      // 如果是链接，直接点击即可
+      (element as HTMLElement).click();
+
+      // 等待 URL 变化
+      let urlChanged = false;
+      for (let i = 0; i < 20; i++) {
+        await this.sleep(200);
+        if (window.location.href !== currentUrl) {
+          console.log('[OmniContext] DeepSeek: URL changed to', window.location.href);
+          urlChanged = true;
+          break;
+        }
+      }
+
+      if (!urlChanged) {
+        console.warn('[OmniContext] DeepSeek: URL did not change after click');
+      }
     } else {
       (element as HTMLElement).click();
     }
@@ -814,6 +853,25 @@ export class BatchCapture {
 
       // 额外等待确保内容完全加载
       await this.sleep(800);
+    } else if (this.platform === 'deepseek') {
+      // DeepSeek: 等待消息元素加载
+      await this.sleep(500); // 初始等待
+
+      // 等待 ds-message 元素出现（最多5秒）
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (attempts < maxAttempts) {
+        const messages = document.querySelectorAll('[class*="ds-message"]');
+        if (messages.length > 0) {
+          console.log('[OmniContext] DeepSeek messages loaded:', messages.length);
+          break;
+        }
+        await this.sleep(500);
+        attempts++;
+      }
+
+      // 额外等待确保内容完全渲染
+      await this.sleep(800);
     } else {
       await this.sleep(1500);
     }
@@ -828,6 +886,9 @@ export class BatchCapture {
     }
     if (this.platform === 'yuanbao') {
       return this.yuanbaoScrollToLoadHistory();
+    }
+    if (this.platform === 'deepseek') {
+      return this.deepseekScrollToLoadHistory();
     }
     return 0;
   }
@@ -1571,6 +1632,155 @@ export class BatchCapture {
     return null;
   }
 
+  // ========== DeepSeek 平台方法 ==========
+
+  private getDeepseekSessionListElements(): Element[] {
+    console.log('[OmniContext] === DeepSeek Session List Debug ===');
+
+    // DeepSeek 会话列表项的类名（基于调试发现的模式）
+    // 1. 首先尝试使用已知的会话列表项类名
+    const knownSelectors = [
+      '._546d736', // 已发现的会话列表项类名
+      '[class*="_546d736"]',
+      '[class*="ds-chat"]',
+      '[class*="ds-history"]',
+      '[class*="ds-session"]',
+      'a[href^="/chat/"]',
+    ];
+
+    for (const selector of knownSelectors) {
+      try {
+        const items = document.querySelectorAll(selector);
+        if (items.length > 0) {
+          // 过滤：排除非会话项
+          const sessionItems = Array.from(items).filter(el => {
+            const text = el.textContent?.trim() || '';
+            const href = el.getAttribute('href') || '';
+            // 会话项特征：有链接到 /chat/ 或文本内容适中
+            return (href.includes('/chat/') ||
+                   (text.length > 0 && text.length < 100 &&
+                    !text.includes('DeepSeek') &&
+                    !text.includes('探索未至之境') &&
+                    !text.includes('发送消息') &&
+                    !text.includes('深度思考') &&
+                    !text.includes('智能搜索')));
+          });
+
+          if (sessionItems.length > 0) {
+            console.log(`[OmniContext] DeepSeek: Found ${sessionItems.length} sessions with selector: ${selector}`);
+            sessionItems.slice(0, 3).forEach((el, i) => {
+              console.log(`[OmniContext]   [${i}] class="${el.className}" text="${el.textContent?.slice(0, 30)}"`);
+            });
+            return sessionItems;
+          }
+        }
+      } catch (e) {
+        console.warn(`[OmniContext] DeepSeek: Selector error: ${selector}`, e);
+      }
+    }
+
+    // 2. 回退方案：分析页面结构
+    console.log('[OmniContext] DeepSeek: Trying fallback session detection...');
+
+    // 检查是否有历史会话按钮需要点击
+    const historyButtonSelectors = [
+      '[class*="history"]',
+      '[class*="session"]',
+      '[class*="chat-list"]',
+      '[aria-label*="历史"]',
+      '[aria-label*="会话"]',
+      'button[class*="menu"]',
+    ];
+
+    for (const selector of historyButtonSelectors) {
+      const btn = document.querySelector(selector);
+      if (btn) {
+        console.log(`[OmniContext] DeepSeek: Found potential history button: ${selector}`);
+        console.log(`[OmniContext]   class: ${btn.className}`);
+        console.log(`[OmniContext]   text: ${btn.textContent?.slice(0, 50)}`);
+      }
+    }
+
+    // 3. 检查所有可能是会话列表的元素
+    const allClickable = document.querySelectorAll('a, button, [role="button"], [tabindex]');
+    const potentialSessionItems: Element[] = [];
+
+    allClickable.forEach(el => {
+      const text = el.textContent?.trim() || '';
+      const href = el.getAttribute('href') || '';
+
+      // 检查是否可能是会话项
+      if ((href.includes('/chat/') || (text.length > 0 && text.length < 100)) &&
+          !text.includes('DeepSeek') &&
+          !text.includes('探索未至之境') &&
+          !text.includes('发送消息') &&
+          !text.includes('深度思考') &&
+          !text.includes('智能搜索')) {
+        potentialSessionItems.push(el);
+      }
+    });
+
+    console.log(`[OmniContext] Found ${potentialSessionItems.length} potential session items`);
+
+    if (potentialSessionItems.length > 0) {
+      potentialSessionItems.slice(0, 5).forEach((el, i) => {
+        console.log(`[OmniContext] [${i}] class="${el.className}"`);
+        console.log(`[OmniContext]     text="${el.textContent?.slice(0, 50)}"`);
+      });
+
+      return potentialSessionItems;
+    }
+
+    console.warn('[OmniContext] DeepSeek: No session list found');
+    console.warn('[OmniContext] DeepSeek may require manually opening the history panel first');
+    return [];
+  }
+
+  private getDeepseekSessionTitle(element: Element): string {
+    // 尝试从元素或其子元素获取标题
+    const text = element.textContent?.trim() || '';
+    // 清理标题
+    return text.replace(/\s+/g, ' ').slice(0, 50) || '未命名会话';
+  }
+
+  private getDeepseekSessionIdFromElement(element: Element): string | null {
+    // 尝试从 href 获取 ID
+    // DeepSeek URL 格式: /a/chat/s/{sessionId}
+    const href = element.getAttribute('href');
+    if (href) {
+      // 首先尝试匹配 /s/{sessionId} 格式
+      const sMatch = href.match(/\/s\/([a-zA-Z0-9_-]+)/);
+      if (sMatch) {
+        console.log(`[OmniContext] DeepSeek: Extracted session ID from href (s format): ${sMatch[1]}`);
+        return sMatch[1];
+      }
+
+      // 回退：匹配 /chat/{sessionId} 格式
+      const chatMatch = href.match(/\/chat\/([a-zA-Z0-9_-]+)/);
+      if (chatMatch) {
+        console.log(`[OmniContext] DeepSeek: Extracted session ID from href (chat format): ${chatMatch[1]}`);
+        return chatMatch[1];
+      }
+    }
+
+    // 尝试 data 属性
+    const dataId = element.getAttribute('data-id') ||
+                   element.getAttribute('data-session-id') ||
+                   element.getAttribute('data-chat-id');
+    if (dataId) {
+      console.log(`[OmniContext] DeepSeek: Extracted session ID from data attribute: ${dataId}`);
+      return dataId;
+    }
+
+    // 使用文本内容的 hash 作为 ID
+    const text = element.textContent?.trim() || '';
+    if (text) {
+      return `deepseek-${this.simpleHash(text)}`;
+    }
+
+    return null;
+  }
+
   private countYuanbaoMessages(root: Element): number {
     // 元宝消息选择器
     const selectors = [
@@ -1646,6 +1856,251 @@ export class BatchCapture {
     }
 
     return this.countYuanbaoMessages(root);
+  }
+
+  private async deepseekScrollToLoadHistory(): Promise<number> {
+    // 查找 DeepSeek 消息区域的根容器
+    const rootSelectors = [
+      '[class*="ds-scroll-area"]',
+      '[class*="chat-container"]',
+      '[class*="conversation"]',
+      'main',
+    ];
+
+    let root: Element | null = null;
+    for (const selector of rootSelectors) {
+      root = document.querySelector(selector);
+      if (root) {
+        console.log(`[OmniContext] Found DeepSeek message root: ${selector}`);
+        break;
+      }
+    }
+
+    if (!root) {
+      console.warn('[OmniContext] DeepSeek message container not found');
+      return this.countDeepseekMessages();
+    }
+
+    // 查找真正可滚动的容器
+    const container = this.findScrollableContainer(root);
+
+    if (!container) {
+      console.warn('[OmniContext] No scrollable DeepSeek message container found');
+      return this.countDeepseekMessages();
+    }
+
+    console.log(`[OmniContext] Scrolling DeepSeek message container`);
+
+    // 滚动到顶部加载历史
+    let lastHeight = container.scrollHeight;
+    let noChangeCount = 0;
+    let messageCount = this.countDeepseekMessages();
+
+    while (noChangeCount < 3 && !this.isCancelled) {
+      (container as HTMLElement).scrollTop = 0;
+      await this.sleep(500);
+
+      if (this.isCancelled) {
+        console.log('[OmniContext] DeepSeek scroll cancelled');
+        return messageCount;
+      }
+
+      if (container.scrollHeight === lastHeight) {
+        noChangeCount++;
+      } else {
+        lastHeight = container.scrollHeight;
+        noChangeCount = 0;
+        messageCount = this.countDeepseekMessages();
+        console.log(`[OmniContext] DeepSeek history loaded, scrollHeight: ${lastHeight}, messages: ${messageCount}`);
+      }
+    }
+
+    return this.countDeepseekMessages();
+  }
+
+  /**
+   * DeepSeek 专用：通过点击链接并刷新会话列表来捕获会话
+   * 每次点击后需要重新获取会话列表，因为 DOM 会更新
+   */
+  private async captureDeepseekSessions(): Promise<void> {
+    const total = this.selectedSessionIds.size;
+    console.log(`[OmniContext] DeepSeek: Starting click-based capture of ${total} sessions`);
+
+    let captured = 0;
+    let newCount = 0;
+    let updatedCount = 0;
+
+    // 将选中的会话 ID 转换为数组，以便按顺序处理
+    const sessionIdsToCapture = Array.from(this.selectedSessionIds);
+
+    for (const sessionId of sessionIdsToCapture) {
+      // 检查暂停/取消
+      while (this.isPaused && !this.isCancelled) {
+        await this.sleep(500);
+      }
+      if (this.isCancelled) {
+        this.reportProgress({
+          total,
+          current: captured,
+          currentTitle: '',
+          captured: this.totalCaptured,
+          status: 'cancelled',
+        });
+        return;
+      }
+
+      // 去重检查
+      if (this.processedSessions.has(sessionId)) {
+        console.log(`[OmniContext] DeepSeek: Skipping duplicate session: ${sessionId}`);
+        continue;
+      }
+
+      // 查找会话信息
+      const sessionInfo = this.discoveredSessions.find(s => s.id === sessionId);
+      if (!sessionInfo) {
+        console.warn(`[OmniContext] DeepSeek: Session info not found for ${sessionId}`);
+        continue;
+      }
+
+      console.log(`[OmniContext] DeepSeek: Processing session ${captured + 1}/${total}: ${sessionInfo.title}`);
+
+      const sessionStart = Date.now();
+
+      // 报告进度
+      this.reportProgress({
+        total,
+        current: captured + 1,
+        currentTitle: sessionInfo.title,
+        captured: this.totalCaptured,
+        status: 'running',
+        eta: this.calculateETA(captured, total),
+      });
+
+      try {
+        // 重新获取会话列表元素（因为每次导航后 DOM 会更新）
+        const sessionElements = await this.getSessionListElements();
+
+        // 找到对应的会话元素
+        let targetElement: Element | null = null;
+        for (const element of sessionElements) {
+          const elementId = this.getSessionIdFromElement(element);
+          if (elementId === sessionId) {
+            targetElement = element;
+            break;
+          }
+        }
+
+        if (!targetElement) {
+          console.warn(`[OmniContext] DeepSeek: Session element not found for ${sessionId}, trying direct navigation`);
+          // 尝试直接点击链接
+          const directLink = document.querySelector(`a[href*="/s/${sessionId}"]`) as HTMLAnchorElement;
+          if (directLink) {
+            targetElement = directLink;
+          } else {
+            console.warn(`[OmniContext] DeepSeek: Could not find session link, skipping`);
+            continue;
+          }
+        }
+
+        // 点击会话
+        const currentUrl = window.location.href;
+        (targetElement as HTMLElement).click();
+        console.log(`[OmniContext] DeepSeek: Clicked on session element`);
+
+        // 等待 URL 变化或消息加载
+        for (let i = 0; i < 20; i++) {
+          await this.sleep(200);
+          if (window.location.href !== currentUrl) {
+            console.log(`[OmniContext] DeepSeek: URL changed to ${window.location.href}`);
+            break;
+          }
+        }
+
+        // 等待消息加载
+        await this.sleep(500);
+        let attempts = 0;
+        const maxAttempts = 15;
+        while (attempts < maxAttempts) {
+          const messages = document.querySelectorAll('[class*="ds-message"]');
+          if (messages.length > 0) {
+            console.log(`[OmniContext] DeepSeek: Messages loaded: ${messages.length}`);
+            break;
+          }
+          await this.sleep(400);
+          attempts++;
+        }
+
+        // 检查取消
+        if (this.isCancelled) {
+          this.reportProgress({
+            total,
+            current: captured,
+            currentTitle: '',
+            captured: this.totalCaptured,
+            status: 'cancelled',
+          });
+          return;
+        }
+
+        // 滚动加载历史
+        console.log(`[OmniContext] DeepSeek: Starting to scroll and load history...`);
+        const sessionMessageTotal = await this.scrollToLoadHistory();
+        console.log(`[OmniContext] DeepSeek: Total messages after scroll: ${sessionMessageTotal}`);
+
+        // 报告进度
+        this.reportProgress({
+          total,
+          current: captured + 1,
+          currentTitle: sessionInfo.title,
+          captured: this.totalCaptured,
+          status: 'running',
+          eta: this.calculateETA(captured, total),
+          sessionMessagesTotal: sessionMessageTotal,
+        });
+
+        // 捕获当前会话
+        const captureResult = await this.captureCurrentSession();
+
+        if (captureResult) {
+          const { session, isNew, isUpdated } = captureResult;
+          this.processedSessions.add(sessionId);
+          this.totalCaptured += session.messageCount;
+
+          if (isNew) {
+            newCount++;
+          } else if (isUpdated) {
+            updatedCount++;
+          }
+        }
+
+        captured++;
+        const sessionTime = Date.now() - sessionStart;
+        this.sessionTimes.push(sessionTime);
+        console.log(`[OmniContext] DeepSeek: Captured session in ${sessionTime}ms`);
+
+      } catch (err: any) {
+        console.error(`[OmniContext] DeepSeek: Error capturing session ${sessionInfo.title}:`, err);
+      }
+    }
+
+    // 完成
+    console.log(`[OmniContext] DeepSeek: Batch capture completed. Captured: ${captured}, New: ${newCount}, Updated: ${updatedCount}`);
+
+    this.reportProgress({
+      total,
+      current: captured,
+      currentTitle: '',
+      captured: this.totalCaptured,
+      status: 'completed',
+    });
+
+    setTimeout(() => this.removeFloatingProgress(), 3000);
+  }
+
+  private countDeepseekMessages(): number {
+    // DeepSeek 消息选择器
+    const messages = document.querySelectorAll('[class*="ds-message"]');
+    return messages.length;
   }
 }
 

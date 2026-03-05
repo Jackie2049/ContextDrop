@@ -111,7 +111,8 @@ function updateIconForUrl(url?: string) {
   const isSupported =
     url.includes('doubao.com') ||
     url.includes('yuanbao.tencent.com') ||
-    url.includes('claude.ai');
+    url.includes('claude.ai') ||
+    url.includes('deepseek.com');
 
   // Set badge to indicate support status
   if (isSupported) {

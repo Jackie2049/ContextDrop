@@ -4,6 +4,43 @@
 
 ---
 
+## 2026-03-05 Phase 1 进度更新（DeepSeek平台适配）
+
+**摘要：** 完成 DeepSeek 平台适配，包括单条捕获、批量捕获、消息提取和思考内容过滤
+
+**正文：**
+
+### 已完成 ✅
+- [x] DeepSeek 平台基础适配
+  - [x] 添加 DeepSeek 到 manifest.json host_permissions 和 content_scripts
+  - [x] 创建 DeepSeek 平台图标 (deepseek.svg)
+  - [x] 添加 DeepSeek 到 Platform 类型和各模块
+- [x] DeepSeek 消息提取
+  - [x] 实现 `extractDeepseekMessages()` 专用方法
+  - [x] 使用 `[class*="ds-message"]` 选择器匹配消息元素
+  - [x] 通过类名模式区分用户/助手消息（d29f3d7d 为用户标识）
+  - [x] 思考内容过滤（排除 ds-think-content，与豆包/元宝一致）
+- [x] DeepSeek 批量捕获
+  - [x] 会话列表检测（`a[href*="/chat/s/"]` 链接）
+  - [x] 会话 ID 提取（从 URL `/a/chat/s/{sessionId}` 提取）
+  - [x] 点击导航策略（每次捕获后重新获取会话元素）
+  - [x] 滚动加载历史消息
+  - [x] 侧边栏可见性检测和用户提示
+- [x] UI 优化
+  - [x] 平台选择下拉框添加 DeepSeek 图标
+  - [x] 批量捕获进度条位置修正（右下角）
+
+### 技术细节
+- **CSS Modules 适配**：DeepSeek 使用哈希类名，通过 `[class*="ds-message"]` 匹配稳定部分
+- **批量捕获策略**：使用点击导航而非 `window.location.href`，避免页面重载导致状态丢失
+- **侧边栏检测**：检查会话链接是否在视口中可见，而非依赖特定类名
+
+### 待验证 ⏳
+- [ ] DeepSeek 批量捕获完整流程测试
+- [ ] 长对话滚动加载测试
+
+---
+
 ## 2026-03-04 Phase 1 进度更新（批量捕获稳定性优化）
 
 **摘要：** 批量捕获互斥锁、元宝会话列表检测、思考内容提取优化

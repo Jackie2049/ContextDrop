@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-03-05 DeepSeek 平台适配
+
+**摘要：** 完成 DeepSeek 平台完整适配，包括消息提取、批量捕获和思考内容过滤
+
+**正文：**
+
+### 平台基础适配
+1. **manifest.json 配置**
+   - 添加 `https://chat.deepseek.com/*` 到 host_permissions
+   - 添加到 content_scripts matches
+   - 创建 deepseek.svg 图标
+
+2. **类型定义更新**
+   - Platform 类型添加 'deepseek'
+   - formatPlatformName 映射
+   - 各模块平台判断逻辑
+
+### 消息提取实现
+1. **选择器适配**
+   - DeepSeek 使用 CSS Modules（哈希类名如 `_63c77b1`）
+   - 稳定类名：`ds-message`（所有消息）、`ds-think-content`（思考内容）
+   - 用户消息特征：类名包含 `d29f3d7d`
+
+2. **extractDeepseekMessages() 方法**
+   ```
+   查找 ds-message 元素 → 检测 ds-think-content → 判断角色 → 提取内容
+   ```
+
+3. **思考内容处理**
+   - 与豆包/元宝保持一致：只捕获最终回答，不包含思考过程
+   - 克隆 DOM → 移除思考区块 → 返回正文
+
+### 批量捕获实现
+1. **会话列表检测**
+   - 选择器：`a[href*="/chat/s/"]`
+   - 可见性检查：`getBoundingClientRect()` 确保在视口内
+
+2. **会话 ID 提取**
+   - URL 格式：`/a/chat/s/{sessionId}`
+   - 正则匹配：`/\/s\/([a-zA-Z0-9_-]+)/`
+
+3. **导航策略**
+   - 问题：`window.location.href` 导致页面重载，JS 状态丢失
+   - 方案：点击会话链接，每次捕获前重新获取会话元素
+   - 代码：`captureDeepseekSessions()` 专用方法
+
+4. **滚动加载历史**
+   - `deepseekScrollToLoadHistory()` 方法
+   - 查找 `[class*="ds-scroll-area"]` 容器
+   - 滚动到顶部加载更多消息
+
+### 侧边栏检测
+1. **检测逻辑**
+   - 检查会话链接是否可见（宽高 > 0）
+   - 至少有 1 个可见链接才认为侧边栏已打开
+
+2. **用户提示**
+   - 不可见时显示：`💡 请在 DeepSeek 页面中点击左上角菜单按钮打开会话历史列表...`
+
+### 问题修复
+1. **批量捕获只捕获1个会话**
+   - 原因：使用 `window.location.href` 导航后 DOM 元素失效
+   - 解决：改用点击方式 + 每次重新查询会话列表
+
+2. **侧边栏检测失败**
+   - 原因：依赖特定类名 `_546d736`（可能变化）
+   - 解决：改用 href 链接检测 + 可见性判断
+
+### 技术要点
+- **CSS Modules 应对**：使用 `[class*="xxx"]` 属性选择器匹配部分类名
+- **SPA 导航**：点击触发路由变化而非页面重载
+- **状态持久化**：存储会话 ID 列表而非 DOM 元素引用
+
+---
+
 ## 2026-03-02 批量捕获完善与会话查看功能
 
 **摘要：** 修复批量捕获多项Bug，新增会话查看功能，优化整体UI体验
