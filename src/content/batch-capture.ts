@@ -645,6 +645,7 @@ export class BatchCapture {
       yuanbao: '元宝',
       claude: 'Claude',
       deepseek: 'DeepSeek',
+      kimi: 'Kimi',
     };
     return names[platform] || platform;
   }
@@ -674,6 +675,9 @@ export class BatchCapture {
     if (this.platform === 'deepseek') {
       return this.getDeepseekSessionListElements();
     }
+    if (this.platform === 'kimi') {
+      return this.getKimiSessionListElements();
+    }
     // 其他平台待实现
     return [];
   }
@@ -688,6 +692,9 @@ export class BatchCapture {
     if (this.platform === 'deepseek') {
       return this.getDeepseekSessionTitle(element);
     }
+    if (this.platform === 'kimi') {
+      return this.getKimiSessionTitle(element);
+    }
     return '未知会话';
   }
 
@@ -700,6 +707,9 @@ export class BatchCapture {
     }
     if (this.platform === 'deepseek') {
       return this.getDeepseekSessionIdFromElement(element);
+    }
+    if (this.platform === 'kimi') {
+      return this.getKimiSessionIdFromElement(element);
     }
     return null;
   }
@@ -821,6 +831,23 @@ export class BatchCapture {
       if (!urlChanged) {
         console.warn('[OmniContext] DeepSeek: URL did not change after click');
       }
+    } else if (this.platform === 'kimi') {
+      // Kimi: 会话是链接，点击后等待 URL 变化
+      const currentUrl = window.location.href;
+      const href = element.getAttribute('href') || '';
+      console.log('[OmniContext] Kimi: Clicking session with href:', href);
+
+      // 直接点击链接
+      (element as HTMLElement).click();
+
+      // 等待 URL 变化
+      for (let i = 0; i < 20; i++) {
+        await this.sleep(200);
+        if (window.location.href !== currentUrl) {
+          console.log('[OmniContext] Kimi: URL changed to', window.location.href);
+          break;
+        }
+      }
     } else {
       (element as HTMLElement).click();
     }
@@ -872,6 +899,26 @@ export class BatchCapture {
 
       // 额外等待确保内容完全渲染
       await this.sleep(800);
+    } else if (this.platform === 'kimi') {
+      // Kimi: 等待消息元素加载
+      await this.sleep(500); // 初始等待
+
+      // 等待 chat-content-item 元素出现（最多5秒）
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (attempts < maxAttempts) {
+        const userMessages = document.querySelectorAll('.chat-content-item-user');
+        const assistantMessages = document.querySelectorAll('.chat-content-item-assistant');
+        if (userMessages.length > 0 || assistantMessages.length > 0) {
+          console.log(`[OmniContext] Kimi messages loaded: ${userMessages.length} user, ${assistantMessages.length} assistant`);
+          break;
+        }
+        await this.sleep(500);
+        attempts++;
+      }
+
+      // 额外等待确保内容完全渲染
+      await this.sleep(800);
     } else {
       await this.sleep(1500);
     }
@@ -897,6 +944,11 @@ export class BatchCapture {
    * 统计当前页面的消息数
    */
   protected countMessages(): number {
+    // Kimi 专用统计
+    if (this.platform === 'kimi') {
+      return this.countKimiMessages();
+    }
+
     const selectors = [
       '[class*="message-item"]',
       '[class*="chat-message"]',
@@ -2101,6 +2153,89 @@ export class BatchCapture {
     // DeepSeek 消息选择器
     const messages = document.querySelectorAll('[class*="ds-message"]');
     return messages.length;
+  }
+
+  // ========== Kimi 平台方法 ==========
+
+  private getKimiSessionListElements(): Element[] {
+    console.log('[OmniContext] === Kimi Session List Debug ===');
+
+    // Kimi 会话列表选择器
+    // 会话项在 .chat-info-item 中，带有链接到 /chat/{sessionId}
+    const sessionItems = document.querySelectorAll('.chat-info-item a[href*="/chat/"]');
+    console.log(`[OmniContext] Kimi: Found ${sessionItems.length} session items with .chat-info-item a[href*="/chat/"]`);
+
+    if (sessionItems.length > 0) {
+      sessionItems.forEach((item, i) => {
+        if (i < 5) {
+          console.log(`[OmniContext] Kimi [${i}] class="${item.className}" href="${item.getAttribute('href')}"`);
+        }
+      });
+      return Array.from(sessionItems);
+    }
+
+    // 备用：直接查找所有会话链接
+    const allChatLinks = document.querySelectorAll('a[href^="/chat/"]');
+    console.log(`[OmniContext] Kimi: Fallback found ${allChatLinks.length} links with href^="/chat/"`);
+
+    if (allChatLinks.length > 0) {
+      return Array.from(allChatLinks).filter(link => {
+        const href = link.getAttribute('href') || '';
+        // 排除历史记录页面链接
+        return !href.includes('/history');
+      });
+    }
+
+    console.warn('[OmniContext] Kimi: No session list found');
+    return [];
+  }
+
+  private getKimiSessionTitle(element: Element): string {
+    // Kimi 会话标题在 .chat-name 或元素文本中
+    const chatName = element.querySelector('.chat-name');
+    if (chatName?.textContent?.trim()) {
+      return chatName.textContent.trim();
+    }
+
+    // 备用：使用链接文本
+    const text = element.textContent?.trim() || '';
+    return text.replace(/\s+/g, ' ').slice(0, 50) || '未命名会话';
+  }
+
+  private getKimiSessionIdFromElement(element: Element): string | null {
+    // Kimi URL 格式: /chat/{sessionId}
+    const href = element.getAttribute('href');
+    if (href) {
+      const match = href.match(/\/chat\/([a-zA-Z0-9_-]+)/);
+      if (match) {
+        console.log(`[OmniContext] Kimi: Extracted session ID: ${match[1]}`);
+        return match[1];
+      }
+    }
+
+    // 尝试 data 属性
+    const dataId = element.getAttribute('data-id') ||
+                   element.getAttribute('data-session-id') ||
+                   element.getAttribute('data-chat-id');
+    if (dataId) {
+      console.log(`[OmniContext] Kimi: Extracted session ID from data attribute: ${dataId}`);
+      return dataId;
+    }
+
+    // 使用文本内容的 hash 作为 ID
+    const text = element.textContent?.trim() || '';
+    if (text) {
+      return `kimi-${this.simpleHash(text)}`;
+    }
+
+    return null;
+  }
+
+  private countKimiMessages(): number {
+    // Kimi 消息选择器
+    const userMessages = document.querySelectorAll('.chat-content-item-user');
+    const assistantMessages = document.querySelectorAll('.chat-content-item-assistant');
+    return Math.max(userMessages.length, assistantMessages.length);
   }
 }
 

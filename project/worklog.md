@@ -4,6 +4,68 @@
 
 ---
 
+## 2026-03-05 Kimi 平台适配
+
+**摘要：** 完成 Kimi (kimi.com) 平台适配，支持消息捕获和批量捕获功能
+
+**正文：**
+
+### 平台基础适配
+1. **manifest.json 配置**
+   - 添加 `https://www.kimi.com/*` 到 host_permissions
+   - 添加到 content_scripts matches
+   - 创建 kimi.svg 图标
+
+2. **类型定义更新**
+   - Platform 类型添加 'kimi'
+   - formatPlatformName 映射
+   - 各模块平台判断逻辑
+
+### 消息提取实现
+1. **选择器适配**
+   - Kimi 使用语义化 CSS 类名（与 DeepSeek 的 CSS Modules 不同）
+   - 用户消息：`.chat-content-item-user`, `.segment-user`
+   - 助手消息：`.chat-content-item-assistant`, `.segment-assistant`
+   - 消息容器：`.chat-content-list`, `.message-list`
+
+2. **extractKimiMessages() 方法**
+   ```
+   查找 chat-content-item 元素 → 判断角色 → 提取文本内容
+   ```
+
+3. **标题提取**
+   - 选择器：`.chat-name`, `[class*="chat-title"]`, `title`
+   - URL 格式：`/chat/{sessionId}`
+
+### 批量捕获实现
+1. **会话列表检测**
+   - 选择器：`.chat-info-item a[href*="/chat/"]`
+   - 侧边栏：`.sidebar` 元素
+
+2. **会话 ID 提取**
+   - URL 格式：`/chat/{sessionId}`
+   - 从链接 href 属性提取
+
+3. **导航策略**
+   - 点击会话链接触发路由变化
+   - `waitForSessionLoad` 等待消息加载
+
+### 文件修改清单
+- `manifest.json` - 添加 Kimi 权限
+- `src/types/index.ts` - Platform 类型
+- `src/utils/extractor.ts` - Kimi 配置和提取方法
+- `src/content/batch-capture.ts` - 批量捕获支持
+- `src/content/index.ts` - 侧边栏检测
+- `src/popup/index.ts` - 平台名称映射
+- `icons/platforms/kimi.svg` - 平台图标
+
+### 技术要点
+- **语义化类名**：Kimi 使用清晰的语义化 CSS 类名，易于选择
+- **URL 路由**：`/chat/{sessionId}` 格式
+- **思考模式**：暂未实现，待后续验证
+
+---
+
 ## 2026-03-05 DeepSeek 平台适配
 
 **摘要：** 完成 DeepSeek 平台完整适配，包括消息提取、批量捕获和思考内容过滤

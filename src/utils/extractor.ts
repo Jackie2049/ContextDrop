@@ -79,6 +79,22 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
       assistant: '[class*="ds-message"]:not([class*="d29f3d7d"]), [class*="ds-chat-message--assistant"]',
     },
   },
+  kimi: {
+    hostname: 'kimi.com',
+    titleSelectors: [
+      'title',
+      '.chat-name',
+      '[class*="chat-title"]',
+      '[class*="session-title"]',
+      'h1',
+    ],
+    messageSelectors: {
+      // Kimi uses semantic class names
+      container: '.chat-content-list, .message-list, [class*="chat-content"]',
+      user: '.chat-content-item-user, .segment-user',
+      assistant: '.chat-content-item-assistant, .segment-assistant',
+    },
+  },
 };
 
 export function detectPlatform(url: string): Platform | null {
@@ -88,6 +104,7 @@ export function detectPlatform(url: string): Platform | null {
   if (hostname.includes('yuanbao.tencent.com')) return 'yuanbao';
   if (hostname.includes('claude.ai')) return 'claude';
   if (hostname.includes('deepseek.com')) return 'deepseek';
+  if (hostname.includes('kimi.com')) return 'kimi';
 
   return null;
 }
@@ -139,6 +156,17 @@ export function extractSessionId(url: string, platform: Platform): string {
       // DeepSeek session IDs are typically UUIDs or long alphanumeric strings
       if (part && part.length >= 8 && /^[a-zA-Z0-9_-]+$/.test(part)) {
         return part;
+      }
+    }
+  }
+
+  // Kimi: URL format is /chat/{sessionId}
+  if (platform === 'kimi') {
+    const chatIndex = pathParts.indexOf('chat');
+    if (chatIndex !== -1 && chatIndex + 1 < pathParts.length) {
+      const sessionId = pathParts[chatIndex + 1];
+      if (sessionId && sessionId.length >= 4) {
+        return sessionId;
       }
     }
   }
@@ -246,6 +274,7 @@ export function formatPlatformName(platform: Platform): string {
     yuanbao: '元宝',
     claude: 'Claude',
     deepseek: 'DeepSeek',
+    kimi: 'Kimi',
   };
   return names[platform];
 }
@@ -298,6 +327,10 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     if (this.platform === 'deepseek') {
       return this.extractDeepseekMessages();
+    }
+
+    if (this.platform === 'kimi') {
+      return this.extractKimiMessages();
     }
 
     const messages: Message[] = [];
@@ -1206,6 +1239,105 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     const mainText = clone.textContent?.trim() || '';
     return mainText;
+  }
+
+  // ========== Kimi 平台消息提取 ==========
+
+  private extractKimiMessages(): Message[] {
+    const messages: Message[] = [];
+
+    console.log('[OmniContext] Extracting Kimi messages...');
+
+    // Kimi 使用语义化类名，结构清晰
+    // 用户消息: .chat-content-item-user 或 .segment-user
+    // 助手消息: .chat-content-item-assistant 或 .segment-assistant
+    // 消息内容: .segment-content
+
+    // 查找所有消息项
+    const userMessages = document.querySelectorAll('.chat-content-item-user');
+    const assistantMessages = document.querySelectorAll('.chat-content-item-assistant');
+
+    console.log(`[OmniContext] Kimi: Found ${userMessages.length} user messages, ${assistantMessages.length} assistant messages`);
+
+    // 合并并按 DOM 顺序排序
+    const allElements: Array<{ el: Element; isUser: boolean }> = [
+      ...Array.from(userMessages).map(el => ({ el, isUser: true })),
+      ...Array.from(assistantMessages).map(el => ({ el, isUser: false })),
+    ];
+
+    // 按 DOM 位置排序
+    allElements.sort((a, b) => {
+      const position = a.el.compareDocumentPosition(b.el);
+      return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    allElements.forEach(({ el, isUser }, index) => {
+      const content = this.extractKimiContent(el);
+      if (content && content.length >= 2) {
+        messages.push({
+          id: `kimi-msg-${index}`,
+          role: isUser ? 'user' : 'assistant',
+          content,
+          timestamp: Date.now(),
+        });
+        console.log(`[OmniContext] Kimi [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
+      }
+    });
+
+    console.log(`[OmniContext] Kimi: Extracted ${messages.length} messages`);
+
+    // 如果没找到消息，尝试备用方案
+    if (messages.length === 0) {
+      return this.extractKimiFromDocument();
+    }
+
+    return messages;
+  }
+
+  private extractKimiContent(element: Element): string {
+    // Kimi 消息内容在 .segment-content 中
+    const contentEl = element.querySelector('.segment-content');
+    if (contentEl?.textContent?.trim()) {
+      return contentEl.textContent.trim();
+    }
+
+    // 备用：直接使用元素文本
+    return element.textContent?.trim() || '';
+  }
+
+  private extractKimiFromDocument(): Message[] {
+    const messages: Message[] = [];
+
+    console.log('[OmniContext] Kimi: Trying fallback extraction...');
+
+    // 查找消息列表容器
+    const container = document.querySelector('.chat-content-list, .message-list, [class*="chat-content"]');
+    if (!container) {
+      console.warn('[OmniContext] Kimi: No message container found');
+      return messages;
+    }
+
+    // 查找所有 segment 元素
+    const segments = container.querySelectorAll('.segment-user, .segment-assistant, [class*="segment"]');
+    console.log(`[OmniContext] Kimi fallback: Found ${segments.length} segments`);
+
+    segments.forEach((segment, index) => {
+      const className = segment.className || '';
+      const isUser = className.includes('user');
+      const content = segment.textContent?.trim() || '';
+
+      if (content.length >= 2) {
+        messages.push({
+          id: `kimi-fallback-${index}`,
+          role: isUser ? 'user' : 'assistant',
+          content,
+          timestamp: Date.now(),
+        });
+      }
+    });
+
+    console.log(`[OmniContext] Kimi fallback: Extracted ${messages.length} messages`);
+    return messages;
   }
 
   private extractMessagesFromDocument(): Message[] {

@@ -1,5 +1,5 @@
 // 支持的平台
-export type Platform = 'doubao' | 'yuanbao' | 'claude' | 'deepseek';
+export type Platform = 'doubao' | 'yuanbao' | 'claude' | 'deepseek' | 'kimi';
 
 // 消息
 export interface Message {

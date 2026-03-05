@@ -11,7 +11,8 @@
     "https://www.doubao.com/*",
     "https://yuanbao.tencent.com/*",
     "https://claude.ai/*",
-    "https://chat.deepseek.com/*"
+    "https://chat.deepseek.com/*",
+    "https://www.kimi.com/*"
   ],
   "action": {
     "default_popup": "src/popup/index.html",
@@ -27,7 +28,8 @@
         "https://www.doubao.com/*",
         "https://yuanbao.tencent.com/*",
         "https://claude.ai/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.com/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"

@@ -27,6 +27,7 @@ function getPlatformIcon(platform: Platform, options: IconOptions = {}): string 
     yuanbao: chrome.runtime.getURL('icons/platforms/yuanbao.svg'),
     claude: chrome.runtime.getURL('icons/platforms/claude.svg'),
     deepseek: chrome.runtime.getURL('icons/platforms/deepseek.svg'),
+    kimi: chrome.runtime.getURL('icons/platforms/kimi.svg'),
   };
   const style = extraStyle ? ` style="${extraStyle}"` : '';
   return `<img class="${className} ${platform}" src="${iconUrls[platform]}" width="${size}" height="${size}" alt="${formatPlatformName(platform)}"${style}>`;
@@ -37,6 +38,7 @@ const PLATFORM_ICONS: Record<Platform, string> = {
   yuanbao: getPlatformIcon('yuanbao'),
   claude: getPlatformIcon('claude'),
   deepseek: getPlatformIcon('deepseek'),
+  kimi: getPlatformIcon('kimi'),
 };
 
 // DOM Elements
@@ -1071,6 +1073,7 @@ async function handleBatchCaptureStart() {
       yuanbao: '元宝',
       claude: 'Claude',
       deepseek: 'DeepSeek',
+      kimi: 'Kimi',
     };
     showToast(`正在批量捕获 ${platformNames[currentPlatform] || currentPlatform} 的会话`);
     return;
@@ -1212,6 +1215,7 @@ function updateBatchCaptureProgress(progress: {
         yuanbao: '元宝',
         claude: 'Claude',
         deepseek: 'DeepSeek',
+        kimi: 'Kimi',
       };
       batchScanningPlatform.textContent = platformNames[currentPlatform] || currentPlatform;
     }
