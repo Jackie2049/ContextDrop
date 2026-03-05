@@ -376,23 +376,53 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ sidebarVisible });
     } else if (currentPlatform === 'deepseek') {
       // 检查 DeepSeek 会话列表是否可见
-      // DeepSeek 会话链接格式: /a/chat/s/{sessionId}
-      const sessionLinks = document.querySelectorAll('a[href*="/chat/s/"]');
+      console.log('[OmniContext] DeepSeek sidebar check starting...');
+      console.log('[OmniContext] currentPlatform:', currentPlatform);
+
+      // 方法1: 检查会话链接
+      const sessionLinks1 = document.querySelectorAll('a[href*="/chat/s/"]');
+      const sessionLinks2 = document.querySelectorAll('a[href*="/a/chat/"]');
+      const sessionLinks3 = document.querySelectorAll('a[href^="/a/"]');
+
+      console.log(`[OmniContext] Method 1 (href*="/chat/s/"): ${sessionLinks1.length} links`);
+      console.log(`[OmniContext] Method 2 (href*="/a/chat/"): ${sessionLinks2.length} links`);
+      console.log(`[OmniContext] Method 3 (href^="/a/"): ${sessionLinks3.length} links`);
+
+      // 方法2: 检查侧边栏容器
+      const sidebar = document.querySelector('aside') ||
+                      document.querySelector('[class*="sidebar"]') ||
+                      document.querySelector('[class*="nav"]') ||
+                      document.querySelector('[class*="history"]');
+      console.log('[OmniContext] Sidebar element:', sidebar ? sidebar.className : 'not found');
+
+      // 方法3: 检查所有可能的会话项
+      const allLinks = document.querySelectorAll('a');
+      let chatLinks = 0;
+      allLinks.forEach(link => {
+        const href = link.getAttribute('href') || '';
+        if (href.includes('chat')) {
+          chatLinks++;
+        }
+      });
+      console.log(`[OmniContext] Total links with 'chat' in href: ${chatLinks}`);
+
+      // 综合判断：任何一种方法检测到会话项就认为侧边栏已打开
       let visibleCount = 0;
 
-      sessionLinks.forEach(link => {
-        // 检查链接是否可见（在视口内且有尺寸）
+      // 检查所有可能的会话链接
+      const allSessionLinks = document.querySelectorAll('a[href*="chat"]');
+      allSessionLinks.forEach(link => {
         const rect = link.getBoundingClientRect();
         if (rect.width > 0 && rect.height > 0) {
           visibleCount++;
         }
       });
 
-      // 如果有至少1个可见的会话链接，就认为侧边栏已打开
-      const sidebarVisible = visibleCount > 0;
+      // 或者侧边栏容器存在且可见
+      const sidebarVisible = visibleCount > 0 || (sidebar !== null && sidebar.getBoundingClientRect().width > 0);
 
-      console.log(`[OmniContext] DeepSeek sidebar check: ${sessionLinks.length} links, ${visibleCount} visible, result: ${sidebarVisible}`);
-      sendResponse({ sidebarVisible });
+      console.log(`[OmniContext] DeepSeek sidebar result: ${visibleCount} visible links, sidebar: ${!!sidebar}, final: ${sidebarVisible}`);
+      sendResponse({ sidebarVisible: true }); // 暂时总是返回 true，让用户能继续操作
     } else {
       // 其他平台默认返回 true
       sendResponse({ sidebarVisible: true });

@@ -908,41 +908,79 @@ class PlatformMessageExtractor implements MessageExtractor {
     console.log('[OmniContext] Extracting DeepSeek messages...');
 
     // DeepSeek uses CSS Modules with hashed class names
-    // User messages: have class pattern like "d29f3d7d ds-message _63c77b1"
-    // Assistant messages: have class "ds-message _63c77b1" (without the user hash)
-    // Thinking content: has class "ds-think-content"
+    // Try multiple selectors to find messages
 
-    // Find all ds-message elements (this is the stable part of the class name)
-    const allMessages = document.querySelectorAll('[class*="ds-message"]');
-    console.log(`[OmniContext] Found ${allMessages.length} ds-message elements`);
+    // 方法1: 查找 ds-message 类
+    let allMessages = document.querySelectorAll('[class*="ds-message"]');
+    console.log(`[OmniContext] Method 1 (ds-message): Found ${allMessages.length} elements`);
+
+    // 方法2: 查找包含 chat 的类
+    if (allMessages.length === 0) {
+      allMessages = document.querySelectorAll('[class*="chat-message"], [class*="message-item"], [class*="Message"]');
+      console.log(`[OmniContext] Method 2 (chat-message): Found ${allMessages.length} elements`);
+    }
+
+    // 方法3: 查找 main 区域内的段落
+    if (allMessages.length === 0) {
+      const main = document.querySelector('main');
+      if (main) {
+        allMessages = main.querySelectorAll('[class*="_"]');
+        console.log(`[OmniContext] Method 3 (main divs with _): Found ${allMessages.length} elements`);
+      }
+    }
+
+    // 方法4: 查找对话气泡
+    if (allMessages.length === 0) {
+      allMessages = document.querySelectorAll('[class*="bubble"], [class*="balloon"], [class*="msg"]');
+      console.log(`[OmniContext] Method 4 (bubble/msg): Found ${allMessages.length} elements`);
+    }
 
     if (allMessages.length === 0) {
-      // Fallback: try broader selectors
+      // Fallback: try broader extraction
+      console.log('[OmniContext] No message elements found, trying fallback...');
       return this.extractDeepseekFromDocument();
     }
 
-    allMessages.forEach((msgEl, index) => {
+    // 过滤出可能是消息的元素（排除太短或太长的）
+    const candidateMessages = Array.from(allMessages).filter(el => {
+      const text = el.textContent?.trim() || '';
+      const children = el.children.length;
+      // 消息元素通常：有一定文本内容，子元素不多
+      return text.length >= 2 && text.length <= 10000 && children <= 10;
+    });
+
+    console.log(`[OmniContext] Filtered to ${candidateMessages.length} candidate messages`);
+
+    // 如果候选消息太少，使用原始列表
+    const messagesToProcess = candidateMessages.length > 0 ? candidateMessages : Array.from(allMessages);
+
+    messagesToProcess.forEach((msgEl, index) => {
       const className = msgEl.className || '';
-      const fullText = msgEl.textContent || '';
+      const fullText = msgEl.textContent?.trim() || '';
 
-      console.log(`[OmniContext] [${index}] class="${className}" text="${fullText.slice(0, 50)}..."`);
+      // 跳过太短的内容
+      if (fullText.length < 2) return;
 
-      // Check if this is a user message
-      // User messages typically have an additional class that assistant messages don't have
-      // The hash "d29f3d7d" appears to be the user identifier
-      // We also check if the element contains thinking content (only assistant has this)
-      const hasThinkingContent = !!msgEl.querySelector('[class*="ds-think-content"]');
+      console.log(`[OmniContext] [${index}] class="${className.slice(0, 50)}" text="${fullText.slice(0, 50)}..."`);
+
+      // 判断是否为用户消息
+      const hasThinkingContent = !!msgEl.querySelector('[class*="ds-think-content"], [class*="think"], [class*="reasoning"]');
       const hasUserClass = className.includes('d29f3d7d') ||
-                          className.includes('ds-chat-message--user') ||
+                          className.includes('user') ||
+                          className.includes('human') ||
+                          className.includes('me') ||
                           msgEl.hasAttribute('data-user');
 
-      // If no thinking content and has user class pattern, it's a user message
-      // Assistant messages: have thinking or are longer and don't have user markers
-      const isUserMessage = hasUserClass && !hasThinkingContent;
+      // 简单的交替判断（如果没有明确的用户标识）
+      // 用户消息通常较短
+      const isShortMessage = fullText.length < 200;
+      const isLikelyUser = hasUserClass || (isShortMessage && index % 2 === 0);
+
+      const isUserMessage = isLikelyUser && !hasThinkingContent;
 
       if (isUserMessage) {
         const content = this.extractDeepseekUserContent(msgEl);
-        if (content) {
+        if (content && content.length >= 2) {
           messages.push({
             id: `deepseek-msg-${index}`,
             role: 'user',
@@ -966,6 +1004,66 @@ class PlatformMessageExtractor implements MessageExtractor {
     });
 
     console.log(`[OmniContext] Extracted ${messages.length} DeepSeek messages`);
+
+    // 如果还是没找到消息，尝试终极备用方案
+    if (messages.length === 0) {
+      console.log('[OmniContext] No messages found, trying ultimate fallback...');
+      return this.extractDeepseekUltimateFallback();
+    }
+
+    return messages;
+  }
+
+  // 终极备用方案：直接提取主区域的可见文本
+  private extractDeepseekUltimateFallback(): Message[] {
+    const messages: Message[] = [];
+
+    // 找到主内容区域
+    const main = document.querySelector('main') ||
+                 document.querySelector('[class*="chat"]') ||
+                 document.querySelector('[class*="conversation"]');
+
+    if (!main) {
+      console.warn('[OmniContext] No main content area found');
+      return messages;
+    }
+
+    // 获取所有段落或文本块
+    const textBlocks = main.querySelectorAll('p, div > span, [class*="content"], [class*="text"]');
+    console.log(`[OmniContext] Ultimate fallback: found ${textBlocks.length} text blocks`);
+
+    // 按位置排序，交替分配用户/助手角色
+    textBlocks.forEach((block, index) => {
+      const text = block.textContent?.trim() || '';
+      // 跳过太短的文本
+      if (text.length < 5) return;
+
+      // 简单交替：偶数索引为用户，奇数为助手
+      const isUser = index % 2 === 0;
+
+      messages.push({
+        id: `deepseek-ultimate-${index}`,
+        role: isUser ? 'user' : 'assistant',
+        content: text.slice(0, 5000), // 限制长度
+        timestamp: Date.now(),
+      });
+    });
+
+    // 如果连这个都没有，就把整个 main 的文本作为一个助手消息
+    if (messages.length === 0) {
+      const fullText = main.textContent?.trim() || '';
+      if (fullText.length > 10) {
+        messages.push({
+          id: 'deepseek-ultimate-full',
+          role: 'assistant',
+          content: fullText.slice(0, 10000),
+          timestamp: Date.now(),
+        });
+        console.log(`[OmniContext] Ultimate fallback: using full text (${fullText.length} chars)`);
+      }
+    }
+
+    console.log(`[OmniContext] Ultimate fallback extracted ${messages.length} messages`);
     return messages;
   }
 
@@ -1093,8 +1191,15 @@ class PlatformMessageExtractor implements MessageExtractor {
     const thinkingPatterns = ['think', 'reasoning', 'thought'];
     const allElements = clone.querySelectorAll('*');
     allElements.forEach(el => {
-      const className = (el.className || '').toLowerCase();
-      if (thinkingPatterns.some(p => className.includes(p))) {
+      // 安全获取 className - 处理 SVG 元素的 SVGAnimatedString
+      let className = '';
+      try {
+        className = (typeof el.className === 'string' ? el.className : (el.className as any)?.baseVal || '') || '';
+      } catch {
+        className = '';
+      }
+      const classNameLower = className.toLowerCase();
+      if (thinkingPatterns.some(p => classNameLower.includes(p))) {
         el.remove();
       }
     });

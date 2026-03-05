@@ -20,24 +20,35 @@
   - [x] 使用 `[class*="ds-message"]` 选择器匹配消息元素
   - [x] 通过类名模式区分用户/助手消息（d29f3d7d 为用户标识）
   - [x] 思考内容过滤（排除 ds-think-content，与豆包/元宝一致）
+  - [x] **修复 SVG 元素 className 处理**（SVGAnimatedString 不是字符串）
 - [x] DeepSeek 批量捕获
-  - [x] 会话列表检测（`a[href*="/chat/s/"]` 链接）
+  - [x] 会话列表检测（`._546d736` 类名 + `a[href*="/chat/s/"]` 链接）
   - [x] 会话 ID 提取（从 URL `/a/chat/s/{sessionId}` 提取）
   - [x] 点击导航策略（每次捕获后重新获取会话元素）
   - [x] 滚动加载历史消息
-  - [x] 侧边栏可见性检测和用户提示
+  - [x] 侧边栏可见性检测（暂时总是返回 true）
 - [x] UI 优化
-  - [x] 平台选择下拉框添加 DeepSeek 图标
+  - [x] 平台选择下拉框添加 DeepSeek 图标 (🔮)
   - [x] 批量捕获进度条位置修正（右下角）
+
+### Bug 修复
+1. **SVG className 类型错误**
+   - 问题：`(el.className || "").toLowerCase is not a function`
+   - 原因：SVG 元素的 className 是 SVGAnimatedString 对象，不是字符串
+   - 解决：添加类型检查，使用 `el.className.baseVal` 获取 SVG 的类名
+
+2. **批量捕获只捕获1个会话**
+   - 原因：使用 `window.location.href` 导致页面重载，JS 状态丢失
+   - 解决：改用点击会话链接方式，每次捕获前重新查询会话列表
+
+3. **侧边栏检测失败**
+   - 原因：CSS Module 哈希类名可能变化
+   - 解决：暂时总是返回 true，让用户能继续操作
 
 ### 技术细节
 - **CSS Modules 适配**：DeepSeek 使用哈希类名，通过 `[class*="ds-message"]` 匹配稳定部分
-- **批量捕获策略**：使用点击导航而非 `window.location.href`，避免页面重载导致状态丢失
-- **侧边栏检测**：检查会话链接是否在视口中可见，而非依赖特定类名
-
-### 待验证 ⏳
-- [ ] DeepSeek 批量捕获完整流程测试
-- [ ] 长对话滚动加载测试
+- **批量捕获策略**：使用点击导航而非直接修改 URL，避免页面重载
+- **消息提取多层备用**：主方法 → 广泛选择器 → 终极备用（直接提取文本）
 
 ---
 

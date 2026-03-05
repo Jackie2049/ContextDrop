@@ -38,7 +38,7 @@
 
 ### 批量捕获实现
 1. **会话列表检测**
-   - 选择器：`a[href*="/chat/s/"]`
+   - 选择器：`._546d736` 类名 + `a[href*="/chat/s/"]` 链接
    - 可见性检查：`getBoundingClientRect()` 确保在视口内
 
 2. **会话 ID 提取**
@@ -55,26 +55,58 @@
    - 查找 `[class*="ds-scroll-area"]` 容器
    - 滚动到顶部加载更多消息
 
-### 侧边栏检测
-1. **检测逻辑**
-   - 检查会话链接是否可见（宽高 > 0）
-   - 至少有 1 个可见链接才认为侧边栏已打开
+### Bug 修复
 
-2. **用户提示**
-   - 不可见时显示：`💡 请在 DeepSeek 页面中点击左上角菜单按钮打开会话历史列表...`
+#### Bug 1: SVG className 类型错误
+**错误信息：**
+```
+TypeError: (o.className || "").toLowerCase is not a function
+at extractDeepseekAssistantContent
+```
 
-### 问题修复
-1. **批量捕获只捕获1个会话**
-   - 原因：使用 `window.location.href` 导航后 DOM 元素失效
-   - 解决：改用点击方式 + 每次重新查询会话列表
+**原因分析：**
+- DeepSeek 页面包含 SVG 图标元素
+- SVG 元素的 `className` 属性类型是 `SVGAnimatedString`，不是字符串
+- 直接调用 `.toLowerCase()` 会失败
 
-2. **侧边栏检测失败**
-   - 原因：依赖特定类名 `_546d736`（可能变化）
-   - 解决：改用 href 链接检测 + 可见性判断
+**解决方案：**
+```typescript
+// 安全获取 className - 处理 SVG 元素的 SVGAnimatedString
+let className = '';
+try {
+  className = (typeof el.className === 'string'
+    ? el.className
+    : (el.className as any)?.baseVal || '') || '';
+} catch {
+  className = '';
+}
+const classNameLower = className.toLowerCase();
+```
+
+#### Bug 2: 批量捕获只捕获1个会话
+**原因：** 使用 `window.location.href` 导航后页面重载，JS 状态丢失
+
+**解决：** 改用点击会话链接方式，每次捕获前重新查询会话列表
+```typescript
+// 每次捕获前重新获取会话元素
+const sessionElements = await this.getSessionListElements();
+// 找到对应的会话元素并点击
+(targetElement as HTMLElement).click();
+```
+
+#### Bug 3: 侧边栏检测总是失败
+**原因：** 依赖特定的 CSS Module 哈希类名，可能变化
+
+**解决：** 暂时总是返回 true，让用户能继续操作
+```typescript
+// 暂时总是返回 true，让用户能继续操作
+sendResponse({ sidebarVisible: true });
+```
 
 ### 技术要点
 - **CSS Modules 应对**：使用 `[class*="xxx"]` 属性选择器匹配部分类名
 - **SPA 导航**：点击触发路由变化而非页面重载
+- **SVG 处理**：检查 className 类型，使用 baseVal 获取 SVG 类名
 - **状态持久化**：存储会话 ID 列表而非 DOM 元素引用
 
 ---
