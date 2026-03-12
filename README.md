@@ -154,33 +154,30 @@ A: 数据存储在浏览器本地（IndexedDB）。
 
 ```
 OmniContext/
-├── src/
+├── src/                     # Chrome 扩展核心源代码
 │   ├── background/          # 后台服务 (Service Worker)
-│   │   └── index.ts
 │   ├── content/             # 内容脚本 (页面注入)
-│   │   └── index.ts
-│   ├── popup/               # 弹窗UI
-│   │   ├── index.html
-│   │   ├── index.ts
-│   │   └── style.css
-│   ├── storage/             # IndexedDB存储封装
-│   │   └── session-storage.ts
-│   ├── types/               # TypeScript类型定义
-│   │   └── index.ts
+│   ├── popup/               # 弹窗 UI
+│   ├── storage/             # IndexedDB 存储封装
+│   ├── types/               # TypeScript 类型定义
 │   └── utils/               # 工具函数
-│       ├── extractor.ts     # DOM提取器
-│       └── formatter.ts     # 格式化输出
 ├── tests/                   # 测试文件
-│   ├── storage.test.ts
-│   ├── extractor.test.ts
-│   └── formatter.test.ts
 ├── project/                 # 项目管理文档
-│   ├── worklog.md           # 工作日志
-│   └── designs.md           # 产品设计
+├── native/                  # Native Messaging Host (Python)
+│   ├── native_host.py       # 本地消息主机
+│   ├── install.py           # 安装脚本
+│   └── README.md
+├── server/                  # Python FastAPI 服务器
+│   ├── main.py              # 服务入口
+│   ├── storage.py           # 存储模块
+│   └── models.py            # 数据模型
+├── sdk/python/              # Python SDK
+├── icons/                   # 图标资源
+├── product/                 # 可分发扩展版本
+├── dist/                    # 构建输出 (.gitignore)
 ├── manifest.json            # 扩展配置
 ├── package.json
-├── tsconfig.json
-└── vite.config.ts
+└── README.md
 ```
 
 ---
@@ -265,8 +262,11 @@ npm run build
 | 平台 | 状态 | 备注 |
 |------|------|------|
 | 豆包 (Doubao) | ✅ | 完整支持CSS Modules解析 |
-| 元宝 (Yuanbao) | 🚧 | 基础支持 |
-| Claude | 🚧 | 基础支持 |
+| 元宝 (Yuanbao) | ✅ | 完整支持 |
+| Claude | ✅ | 完整支持 |
+| DeepSeek | ✅ | 完整支持 |
+| Kimi | ✅ | 完整支持 |
+| Gemini | ✅ | 新增支持 |
 
 ---
 

@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+product/
 
 # IDE
 .vscode/
@@ -23,3 +24,12 @@ npm-debug.log*
 # Testing
 coverage/
 public/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Zone.Identifier (Windows downloads)
+*:Zone.Identifier

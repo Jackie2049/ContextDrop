@@ -17,11 +17,15 @@ cd "$PROJECT_DIR"
 echo "[1/3] 构建扩展..."
 npm run build
 
-echo "[2/3] 删除桌面旧版本..."
+echo "[2/4] 删除桌面旧版本..."
 rm -rf "$DESKTOP_DIR/$EXTENSION_NAME"
 
-echo "[3/3] 复制新版本到桌面..."
+echo "[3/4] 复制新版本到桌面..."
 cp -r "$PROJECT_DIR/dist" "$DESKTOP_DIR/$EXTENSION_NAME"
+
+echo "[4/4] 更新 product 目录..."
+rm -rf "$PROJECT_DIR/product"
+cp -r "$PROJECT_DIR/dist" "$PROJECT_DIR/product"
 
 echo ""
 echo "========================================"
