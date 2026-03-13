@@ -1,5 +1,5 @@
 // 支持的平台
-export type Platform = 'doubao' | 'yuanbao' | 'claude' | 'deepseek' | 'kimi' | 'gemini';
+export type Platform = 'doubao' | 'yuanbao' | 'claude' | 'deepseek' | 'kimi' | 'gemini' | 'chatgpt';
 
 // 数据来源类型
 export type Source = 'platform' | 'api';

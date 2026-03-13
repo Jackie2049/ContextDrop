@@ -29,6 +29,7 @@ function getPlatformIcon(platform: Platform | undefined, options: IconOptions = 
     deepseek: chrome.runtime.getURL('icons/platforms/deepseek.svg'),
     kimi: chrome.runtime.getURL('icons/platforms/kimi.svg'),
     gemini: chrome.runtime.getURL('icons/platforms/gemini.svg'),
+    chatgpt: chrome.runtime.getURL('icons/platforms/chatgpt.svg'),
   };
   const style = extraStyle ? ` style="${extraStyle}"` : '';
   const defaultIcon = '🤖'; // Fallback for unknown platforms
@@ -45,6 +46,7 @@ const PLATFORM_ICONS: Record<Platform, string> = {
   deepseek: getPlatformIcon('deepseek'),
   kimi: getPlatformIcon('kimi'),
   gemini: getPlatformIcon('gemini'),
+  chatgpt: getPlatformIcon('chatgpt'),
 };
 
 // DOM Elements
@@ -1165,6 +1167,7 @@ async function handleBatchCaptureStart() {
       deepseek: 'DeepSeek',
       kimi: 'Kimi',
       gemini: 'Gemini',
+      chatgpt: 'ChatGPT',
     };
     showToast(`正在批量捕获 ${platformNames[currentPlatform] || currentPlatform} 的会话`);
     return;
@@ -1308,6 +1311,7 @@ function updateBatchCaptureProgress(progress: {
         deepseek: 'DeepSeek',
         kimi: 'Kimi',
         gemini: 'Gemini',
+      chatgpt: 'ChatGPT',
       };
       batchScanningPlatform.textContent = platformNames[currentPlatform] || currentPlatform;
     }

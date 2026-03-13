@@ -3,14 +3,7 @@
 
 // ========== Side Panel 配置 ==========
 
-// 点击扩展图标时打开侧边栏
-chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
-    chrome.sidePanel.open({ tabId: tab.id });
-  }
-});
-
-// 允许在所有标签页使用侧边栏
+// 允许在所有标签页使用侧边栏（点击图标或快捷键时打开）
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // ========== 全局状态 ==========

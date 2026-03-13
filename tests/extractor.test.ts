@@ -34,6 +34,14 @@ describe('extractor', () => {
       expect(detectPlatform('https://gemini.google.com/app/abc123')).toBe('gemini');
     });
 
+    it('should detect chatgpt from URL', () => {
+      expect(detectPlatform('https://chatgpt.com/c/abc123')).toBe('chatgpt');
+    });
+
+    it('should detect chatgpt from legacy openai URL', () => {
+      expect(detectPlatform('https://chat.openai.com/c/abc123')).toBe('chatgpt');
+    });
+
     it('should return null for unknown URL', () => {
       expect(detectPlatform('https://unknown.com/chat/123')).toBeNull();
     });
@@ -91,6 +99,23 @@ describe('extractor', () => {
       const result = extractSessionId('https://gemini.google.com/', 'gemini');
       expect(result).toContain('gemini-');
     });
+
+    it('should extract session ID from chatgpt URL', () => {
+      expect(extractSessionId('https://chatgpt.com/c/chatgpt-session-abc', 'chatgpt')).toBe('chatgpt-session-abc');
+    });
+
+    it('should extract session ID from chatgpt legacy URL', () => {
+      expect(extractSessionId('https://chat.openai.com/c/legacy-session-123', 'chatgpt')).toBe('legacy-session-123');
+    });
+
+    it('should extract session ID from chatgpt GPTs URL', () => {
+      expect(extractSessionId('https://chatgpt.com/g/gizmo123/c/gpt-session-456', 'chatgpt')).toBe('gpt-session-456');
+    });
+
+    it('should return platform-prefixed hash for chatgpt root', () => {
+      const result = extractSessionId('https://chatgpt.com/', 'chatgpt');
+      expect(result).toContain('chatgpt-');
+    });
   });
 
   describe('createMessageExtractor', () => {
@@ -122,6 +147,18 @@ describe('extractor', () => {
       const extractor = createMessageExtractor('kimi');
       expect(extractor).toBeDefined();
       expect(extractor.platform).toBe('kimi');
+    });
+
+    it('should create extractor for gemini', () => {
+      const extractor = createMessageExtractor('gemini');
+      expect(extractor).toBeDefined();
+      expect(extractor.platform).toBe('gemini');
+    });
+
+    it('should create extractor for chatgpt', () => {
+      const extractor = createMessageExtractor('chatgpt');
+      expect(extractor).toBeDefined();
+      expect(extractor.platform).toBe('chatgpt');
     });
   });
 
@@ -666,6 +703,7 @@ describe('extractor', () => {
 
     it('should format gemini', () => {
       expect(formatPlatformName('gemini')).toBe('Gemini');
+    expect(formatPlatformName('chatgpt')).toBe('ChatGPT');
     });
   });
 

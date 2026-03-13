@@ -647,6 +647,7 @@ export class BatchCapture {
       deepseek: 'DeepSeek',
       kimi: 'Kimi',
       gemini: 'Gemini',
+      chatgpt: 'ChatGPT',
     };
     return names[platform] || platform;
   }

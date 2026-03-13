@@ -24,7 +24,9 @@
     "https://claude.ai/*",
     "https://chat.deepseek.com/*",
     "https://www.kimi.com/*",
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
   ],
   "action": {
     "default_title": "OmniContext - 打开侧边栏",
@@ -45,7 +47,9 @@
         "https://claude.ai/*",
         "https://chat.deepseek.com/*",
         "https://www.kimi.com/*",
-        "https://gemini.google.com/*"
+        "https://gemini.google.com/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle"
