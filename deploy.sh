@@ -4,7 +4,7 @@
 
 set -e
 
-PROJECT_DIR="/home/zhaozifeng/cc-workspace/OmniContext"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP_DIR="/mnt/c/Users/73523/Desktop"
 EXTENSION_NAME="OmniContext"
 
