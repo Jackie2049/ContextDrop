@@ -2299,6 +2299,20 @@ export class BatchCapture {
     return Math.max(userMessages.length, assistantMessages.length);
   }
 
+  // ========== ChatGPT 平台方法 ==========
+
+  private countChatgptMessages(): number {
+    // ChatGPT uses data-testid="conversation-turn-{index}" for each turn
+    const turnElements = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+    if (turnElements.length > 0) {
+      return turnElements.length;
+    }
+    // Fallback: use message author role selectors
+    const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
+    const assistantMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+    return Math.max(userMessages.length, assistantMessages.length);
+  }
+
   // ========== Gemini 平台方法 ==========
 
   private getGeminiSessionListElements(): Element[] {
