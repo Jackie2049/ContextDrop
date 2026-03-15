@@ -683,6 +683,9 @@ export class BatchCapture {
     if (this.platform === 'gemini') {
       return this.getGeminiSessionListElements();
     }
+    if (this.platform === 'chatgpt') {
+      return this.getChatgptSessionListElements();
+    }
     // 其他平台待实现
     return [];
   }
@@ -703,6 +706,9 @@ export class BatchCapture {
     if (this.platform === 'gemini') {
       return this.getGeminiSessionTitle(element);
     }
+    if (this.platform === 'chatgpt') {
+      return this.getChatgptSessionTitle(element);
+    }
     return '未知会话';
   }
 
@@ -722,6 +728,9 @@ export class BatchCapture {
     if (this.platform === 'gemini') {
       return this.getGeminiSessionIdFromElement(element);
     }
+    if (this.platform === 'chatgpt') {
+      return this.getChatgptSessionIdFromElement(element);
+    }
     return null;
   }
 
@@ -738,6 +747,23 @@ export class BatchCapture {
       items.forEach(item => {
         const hasId = item.querySelector('[data-item-id]') || item.hasAttribute('dt-cid');
         if (hasId) count++;
+      });
+      return count;
+    }
+
+    if (this.platform === 'chatgpt') {
+      // ChatGPT: 查找会话链接
+      const items = sidebar.querySelectorAll('a[href^="/c/"]');
+      // 过滤：排除 New chat 等
+      let count = 0;
+      items.forEach(item => {
+        const href = item.getAttribute('href') || '';
+        const text = item.textContent?.trim() || '';
+        if (href.length > 3 &&
+            !text.toLowerCase().includes('new chat') &&
+            !text.toLowerCase().includes('new conversation')) {
+          count++;
+        }
       });
       return count;
     }
@@ -876,6 +902,23 @@ export class BatchCapture {
           break;
         }
       }
+    } else if (this.platform === 'chatgpt') {
+      // ChatGPT: 会话是链接，点击后等待 URL 变化
+      const currentUrl = window.location.href;
+      const href = element.getAttribute('href') || '';
+      console.log('[OmniContext] ChatGPT: Clicking session with href:', href);
+
+      // 直接点击链接
+      (element as HTMLElement).click();
+
+      // 等待 URL 变化
+      for (let i = 0; i < 20; i++) {
+        await this.sleep(200);
+        if (window.location.href !== currentUrl) {
+          console.log('[OmniContext] ChatGPT: URL changed to', window.location.href);
+          break;
+        }
+      }
     } else {
       (element as HTMLElement).click();
     }
@@ -967,6 +1010,58 @@ export class BatchCapture {
 
       // 额外等待确保内容完全渲染
       await this.sleep(800);
+    } else if (this.platform === 'chatgpt') {
+      // ChatGPT: 等待消息元素加载
+      console.log('[OmniContext] ChatGPT: Waiting for session to load...');
+      await this.sleep(800); // 初始等待，给页面更多时间加载
+
+      // 首先等待主容器出现
+      let containerAttempts = 0;
+      while (containerAttempts < 10) {
+        const main = document.querySelector('main');
+        const chatContainer = document.querySelector('[class*="conversation-container"]');
+        const article = document.querySelector('article');
+        if (main || chatContainer || article) {
+          console.log('[OmniContext] ChatGPT: Main container found');
+          break;
+        }
+        await this.sleep(300);
+        containerAttempts++;
+      }
+
+      // 等待消息元素出现（最多8秒）
+      let attempts = 0;
+      const maxAttempts = 16;
+      let foundMessages = false;
+
+      while (attempts < maxAttempts && !foundMessages) {
+        const turnElements = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+        const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
+        const assistantMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+        const allText = document.querySelectorAll('main [class*="markdown"], main [class*="prose"]');
+
+        if (turnElements.length > 0 || userMessages.length > 0 || assistantMessages.length > 0 || allText.length > 0) {
+          console.log(`[OmniContext] ChatGPT messages loaded: ${turnElements.length} turns, ${userMessages.length} user, ${assistantMessages.length} assistant, ${allText.length} text blocks`);
+          foundMessages = true;
+          break;
+        }
+
+        // 检查是否还在加载中
+        const loadingElements = document.querySelectorAll('[class*="loading"], [class*="spinner"], [aria-busy="true"]');
+        if (loadingElements.length > 0) {
+          console.log(`[OmniContext] ChatGPT: Still loading... (${attempts})`);
+        }
+
+        await this.sleep(500);
+        attempts++;
+      }
+
+      if (!foundMessages) {
+        console.warn('[OmniContext] ChatGPT: No messages found after waiting, page might be empty or structure changed');
+      }
+
+      // 额外等待确保内容完全渲染
+      await this.sleep(1000);
     } else {
       await this.sleep(1500);
     }
@@ -988,6 +1083,9 @@ export class BatchCapture {
     if (this.platform === 'gemini') {
       return this.geminiScrollToLoadHistory();
     }
+    if (this.platform === 'chatgpt') {
+      return this.chatgptScrollToLoadHistory();
+    }
     return 0;
   }
 
@@ -998,6 +1096,10 @@ export class BatchCapture {
     // Kimi 专用统计
     if (this.platform === 'kimi') {
       return this.countKimiMessages();
+    }
+    // ChatGPT 专用统计
+    if (this.platform === 'chatgpt') {
+      return this.countChatgptMessages();
     }
 
     // Gemini 专用统计
@@ -1124,6 +1226,16 @@ export class BatchCapture {
         '.yb-common-nav',
         '.yb-nav',
         '[class*="recent-conv-list"]',
+      ];
+    } else if (this.platform === 'chatgpt') {
+      // ChatGPT: 侧边栏选择器
+      sidebarSelectors = [
+        'nav',
+        'aside',
+        '[class*="sidebar"]',
+        '[class*="history"]',
+        '[data-testid="history-sidebar"]',
+        '[class*="conversation-list"]',
       ];
     } else {
       // 豆包及其他平台
@@ -1304,6 +1416,85 @@ export class BatchCapture {
     if (this.platform === 'yuanbao') {
       return this.ensureYuanbaoSidebarOpen();
     }
+    if (this.platform === 'chatgpt') {
+      return this.ensureChatgptSidebarOpen();
+    }
+    if (this.platform === 'gemini') {
+      return this.ensureGeminiSidebarOpen();
+    }
+    if (this.platform === 'deepseek') {
+      return this.ensureDeepseekSidebarOpen();
+    }
+    if (this.platform === 'kimi') {
+      return this.ensureKimiSidebarOpen();
+    }
+  }
+
+  private async ensureChatgptSidebarOpen(): Promise<void> {
+    // ChatGPT: 检查侧边栏是否存在
+    const sidebar = document.querySelector('nav') ||
+                    document.querySelector('aside') ||
+                    document.querySelector('[class*="sidebar"]') ||
+                    document.querySelector('[class*="history"]');
+
+    if (sidebar) {
+      console.log('[OmniContext] ChatGPT sidebar found');
+      // 等待侧边栏内容加载
+      await this.sleep(500);
+      return;
+    }
+
+    console.warn('[OmniContext] ChatGPT sidebar not found');
+  }
+
+  private async ensureGeminiSidebarOpen(): Promise<void> {
+    // Gemini: 检查侧边栏是否存在
+    const sidebar = document.querySelector('nav') ||
+                    document.querySelector('aside') ||
+                    document.querySelector('[class*="conversation-list"]');
+
+    if (sidebar) {
+      console.log('[OmniContext] Gemini sidebar found');
+      await this.sleep(500);
+      return;
+    }
+
+    console.warn('[OmniContext] Gemini sidebar not found');
+  }
+
+  private async ensureDeepseekSidebarOpen(): Promise<void> {
+    // DeepSeek: 侧边栏可能需要点击历史记录按钮打开
+    const sidebar = document.querySelector('[class*="ds-sidebar"]') ||
+                    document.querySelector('[class*="chat-list"]');
+
+    if (sidebar) {
+      console.log('[OmniContext] DeepSeek sidebar found');
+      return;
+    }
+
+    // 尝试打开历史记录面板
+    console.log('[OmniContext] DeepSeek sidebar not found, trying to open history panel');
+    const historyButton = document.querySelector('[class*="history"]') ||
+                          document.querySelector('button[aria-label*="history"]') ||
+                          document.querySelector('[class*="menu"]');
+
+    if (historyButton) {
+      (historyButton as HTMLElement).click();
+      await this.sleep(1000);
+    }
+  }
+
+  private async ensureKimiSidebarOpen(): Promise<void> {
+    // Kimi: 检查侧边栏是否存在
+    const sidebar = document.querySelector('[class*="chat-list"]') ||
+                    document.querySelector('[class*="sidebar"]');
+
+    if (sidebar) {
+      console.log('[OmniContext] Kimi sidebar found');
+      return;
+    }
+
+    console.warn('[OmniContext] Kimi sidebar not found');
   }
 
   private async ensureDoubaoSidebarOpen(): Promise<void> {
@@ -2295,6 +2486,20 @@ export class BatchCapture {
     return Math.max(userMessages.length, assistantMessages.length);
   }
 
+  // ========== ChatGPT 平台方法 ==========
+
+  private countChatgptMessages(): number {
+    // ChatGPT uses data-testid="conversation-turn-{index}" for each turn
+    const turnElements = document.querySelectorAll('[data-testid^="conversation-turn-"]');
+    if (turnElements.length > 0) {
+      return turnElements.length;
+    }
+    // Fallback: use message author role selectors
+    const userMessages = document.querySelectorAll('[data-message-author-role="user"]');
+    const assistantMessages = document.querySelectorAll('[data-message-author-role="assistant"]');
+    return Math.max(userMessages.length, assistantMessages.length);
+  }
+
   // ========== Gemini 平台方法 ==========
 
   private getGeminiSessionListElements(): Element[] {
@@ -2448,6 +2653,209 @@ export class BatchCapture {
     }
 
     return this.countGeminiMessages();
+  }
+
+  // ========== ChatGPT 平台特定方法 ==========
+
+  private getChatgptSessionListElements(): Element[] {
+    console.log('[OmniContext] === ChatGPT Session List Debug ===');
+
+    // ChatGPT 会话链接格式: /c/{conversation_id} 或 /chat/{conversation_id}
+    // 主要选择器：查找以 /c/ 开头的链接
+    const sessionItems = document.querySelectorAll('a[href^="/c/"]');
+    console.log(`[OmniContext] ChatGPT: Found ${sessionItems.length} session items with a[href^="/c/"]`);
+
+    if (sessionItems.length > 0) {
+      // 过滤：排除非会话项（如设置、帮助等）
+      const sessionLinks = Array.from(sessionItems).filter(el => {
+        const href = el.getAttribute('href') || '';
+        const text = el.textContent?.trim() || '';
+        // 排除 New chat 按钮和一些特殊页面
+        return href.length > 3 && // /c/ + at least one char
+               !text.toLowerCase().includes('new chat') &&
+               !text.toLowerCase().includes('new conversation') &&
+               !href.includes('/c/new');
+      });
+
+      if (sessionLinks.length > 0) {
+        console.log(`[OmniContext] ChatGPT: Filtered to ${sessionLinks.length} valid sessions`);
+        sessionLinks.slice(0, 5).forEach((item, i) => {
+          console.log(`[OmniContext] ChatGPT [${i}] class="${item.className}" href="${item.getAttribute('href')}" text="${item.textContent?.slice(0, 30)}"`);
+        });
+        return sessionLinks;
+      }
+    }
+
+    // 备用选择器：尝试 /chat/ 格式
+    const chatItems = document.querySelectorAll('a[href^="/chat/"]');
+    if (chatItems.length > 0) {
+      const sessionLinks = Array.from(chatItems).filter(el => {
+        const href = el.getAttribute('href') || '';
+        const text = el.textContent?.trim() || '';
+        return href.length > 6 &&
+               !text.toLowerCase().includes('new chat');
+      });
+      if (sessionLinks.length > 0) {
+        console.log(`[OmniContext] ChatGPT: Found ${sessionLinks.length} sessions with /chat/ format`);
+        return sessionLinks;
+      }
+    }
+
+    // 回退方案：查找侧边栏中的会话项
+    const sidebarSelectors = [
+      '[class*="conversation-list"] a',
+      '[class*="history-list"] a',
+      '[class*="session-list"] a',
+      '[class*="chat-list"] a',
+      'nav a[href*="/c/"]',
+      'aside a[href*="/c/"]',
+      'nav a[href*="/chat/"]',
+      'aside a[href*="/chat/"]',
+    ];
+
+    for (const selector of sidebarSelectors) {
+      const items = document.querySelectorAll(selector);
+      if (items.length > 0) {
+        const sessionLinks = Array.from(items).filter(el => {
+          const href = el.getAttribute('href') || '';
+          const text = el.textContent?.trim() || '';
+          return (href.startsWith('/c/') || href.startsWith('/chat/')) &&
+                 href.length > 3 &&
+                 !text.toLowerCase().includes('new chat');
+        });
+        if (sessionLinks.length > 0) {
+          console.log(`[OmniContext] ChatGPT: Fallback found ${sessionLinks.length} sessions with ${selector}`);
+          return sessionLinks;
+        }
+      }
+    }
+
+    console.warn('[OmniContext] ChatGPT: No session list found');
+    return [];
+  }
+
+  private getChatgptSessionTitle(element: Element): string {
+    // 首先尝试从子元素获取标题
+    const titleSelectors = [
+      '[class*="title"]',
+      '[class*="text"]',
+      '[class*="label"]',
+      '[class*="name"]',
+      'div[class*="truncate"]',
+      'span[class*="truncate"]',
+    ];
+
+    for (const selector of titleSelectors) {
+      const titleEl = element.querySelector(selector);
+      if (titleEl?.textContent?.trim()) {
+        const title = titleEl.textContent.trim();
+        if (title && title.toLowerCase() !== 'new chat') {
+          return title.replace(/\s+/g, ' ').slice(0, 50);
+        }
+      }
+    }
+
+    // 备用：使用链接文本
+    const text = element.textContent?.trim() || '';
+    const cleaned = text.replace(/\s+/g, ' ').slice(0, 50);
+    return cleaned || '未命名会话';
+  }
+
+  private getChatgptSessionIdFromElement(element: Element): string | null {
+    // ChatGPT URL 格式: /c/{conversation_id} 或 /chat/{conversation_id}
+    const href = element.getAttribute('href');
+    if (href) {
+      // 匹配 /c/{id} 格式
+      const cMatch = href.match(/\/c\/([a-zA-Z0-9-]+)/);
+      if (cMatch) {
+        console.log(`[OmniContext] ChatGPT: Extracted session ID from href (c format): ${cMatch[1]}`);
+        return cMatch[1];
+      }
+
+      // 匹配 /chat/{id} 格式
+      const chatMatch = href.match(/\/chat\/([a-zA-Z0-9-]+)/);
+      if (chatMatch) {
+        console.log(`[OmniContext] ChatGPT: Extracted session ID from href (chat format): ${chatMatch[1]}`);
+        return chatMatch[1];
+      }
+    }
+
+    // 尝试 data 属性
+    const dataId = element.getAttribute('data-id') ||
+                   element.getAttribute('data-session-id') ||
+                   element.getAttribute('data-conversation-id');
+    if (dataId) {
+      console.log(`[OmniContext] ChatGPT: Extracted session ID from data attribute: ${dataId}`);
+      return dataId;
+    }
+
+    // 使用文本内容的 hash 作为 ID
+    const text = element.textContent?.trim() || '';
+    if (text) {
+      return `chatgpt-${this.simpleHash(text)}`;
+    }
+
+    return null;
+  }
+
+  private async chatgptScrollToLoadHistory(): Promise<number> {
+    // 查找 ChatGPT 消息区域的根容器
+    const rootSelectors = [
+      'main',
+      '[class*="conversation-container"]',
+      '[class*="chat-container"]',
+      '[data-testid="conversation-turn-0"]',
+    ];
+
+    let root: Element | null = null;
+    for (const selector of rootSelectors) {
+      root = document.querySelector(selector);
+      if (root) {
+        console.log(`[OmniContext] Found ChatGPT message root: ${selector}`);
+        break;
+      }
+    }
+
+    if (!root) {
+      console.warn('[OmniContext] ChatGPT message container not found');
+      return this.countChatgptMessages();
+    }
+
+    // 查找真正可滚动的容器
+    const container = this.findScrollableContainer(root);
+
+    if (!container) {
+      console.warn('[OmniContext] No scrollable ChatGPT message container found');
+      return this.countChatgptMessages();
+    }
+
+    console.log(`[OmniContext] Scrolling ChatGPT message container`);
+
+    // 滚动到顶部加载历史
+    let lastHeight = container.scrollHeight;
+    let noChangeCount = 0;
+    let messageCount = this.countChatgptMessages();
+
+    while (noChangeCount < 3 && !this.isCancelled) {
+      (container as HTMLElement).scrollTop = 0;
+      await this.sleep(500);
+
+      if (this.isCancelled) {
+        console.log('[OmniContext] ChatGPT scroll cancelled');
+        return messageCount;
+      }
+
+      if (container.scrollHeight === lastHeight) {
+        noChangeCount++;
+      } else {
+        lastHeight = container.scrollHeight;
+        noChangeCount = 0;
+        messageCount = this.countChatgptMessages();
+        console.log(`[OmniContext] ChatGPT history loaded, scrollHeight: ${lastHeight}, messages: ${messageCount}`);
+      }
+    }
+
+    return this.countChatgptMessages();
   }
 }
 

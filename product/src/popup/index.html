@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniContext</title>
+  <script type="module" crossorigin src="/assets/popup-BQB01kRe.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/extractor-OfZFsms3.js">
+  <link rel="stylesheet" crossorigin href="/assets/popup-D3pQA1Pb.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>🧠 OmniContext</h1>
+      <span id="current-page" class="current-page">检测中...</span>
+      <span id="server-status" class="server-status" title="本地服务器状态">○</span>
+    </header>
+
+    <!-- Batch Capture Section -->
+    <div id="batch-capture-section" class="batch-capture-section" style="display: none;">
+      <button id="batch-capture-btn" class="btn btn-batch">📦 批量捕获当前平台所有会话</button>
+    </div>
+
+    <!-- Batch Scanning Status -->
+    <div id="batch-scanning" class="batch-scanning" style="display: none;">
+      <div class="batch-scanning-content">
+        <span class="batch-scanning-text">正在扫描 <strong id="batch-scan-platform"></strong> 的会话列表</span>
+        <span class="batch-scanning-dots"><span>.</span><span>.</span><span>.</span></span>
+        <span class="batch-scanning-count">已找到 <strong>0</strong> 个</span>
+      </div>
+      <button id="batch-scan-cancel-btn" class="btn btn-sm btn-danger">取消</button>
+    </div>
+
+    <!-- Batch Capture Progress -->
+    <div id="batch-progress" class="batch-progress" style="display: none;">
+      <div class="batch-progress-header">
+        <span>批量捕获进行中...</span>
+      </div>
+      <div class="batch-progress-bar">
+        <div id="batch-progress-fill" class="batch-progress-fill"></div>
+      </div>
+      <div class="batch-progress-info-row">
+        <span id="batch-progress-count" class="batch-progress-count">0/0</span>
+        <span id="batch-progress-eta" class="batch-progress-eta"></span>
+      </div>
+      <div id="batch-progress-title" class="batch-progress-title">准备中...</div>
+      <div class="batch-progress-actions">
+        <button id="batch-cancel-btn" class="btn btn-sm btn-danger">取消</button>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-container">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="搜索会话...">
+        <button id="search-clear" class="search-clear" style="display: none;">×</button>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-wrapper">
+          <select id="filter-platform" class="filter-select">
+            <option value="">全部平台</option>
+            <option value="doubao">🫘 豆包</option>
+            <option value="yuanbao">💎 元宝</option>
+            <option value="claude">🤖 Claude</option>
+            <option value="deepseek">🔮 DeepSeek</option>
+            <option value="kimi">🌙 Kimi</option>
+            <option value="gemini">✨ Gemini</option>
+          </select>
+        </div>
+        <div class="filter-wrapper">
+          <select id="filter-tags" class="filter-select">
+            <option value="">全部标签</option>
+            <!-- Tags will be populated dynamically -->
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <main class="main">
+      <div id="session-list" class="session-list">
+        <div class="loading">加载中...</div>
+      </div>
+    </main>
+
+    <!-- Delete Mode Bar (shown when in delete mode) -->
+    <div id="delete-mode-bar" class="delete-mode-bar" style="display: none;">
+      <div class="delete-mode-left">
+        <label class="delete-select-all">
+          <input type="checkbox" id="delete-select-all-checkbox">
+          <span>全选</span>
+        </label>
+        <span class="delete-mode-info">已选择 <strong id="delete-selected-count">0</strong> 个</span>
+      </div>
+      <div class="delete-mode-actions">
+        <button id="delete-cancel-btn" class="btn btn-sm btn-secondary">取消</button>
+        <button id="delete-confirm-btn" class="btn btn-sm btn-danger">删除</button>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <button id="manage-btn" class="btn btn-secondary">🗑️ 管理</button>
+      <button id="export-btn" class="btn btn-secondary">📤 导出</button>
+      <button id="import-btn" class="btn btn-secondary">📥 导入</button>
+      <button id="refresh-btn" class="btn btn-primary">🔄 刷新</button>
+    </footer>
+
+    <!-- Debug Info -->
+    <div id="debug-info" class="debug-info" style="display: none;">
+      <span id="debug-sessions">会话: 0</span>
+      <span id="debug-storage">存储: 0 KB</span>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Import Dialog -->
+  <div id="import-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">📥 导入确认</div>
+      <div class="dialog-body">
+        <div class="dialog-info">
+          <div>文件：<span id="import-filename">-</span></div>
+          <div>会话数：<span id="import-session-count">0</span></div>
+          <div>标签数：<span id="import-tag-count">0</span></div>
+        </div>
+        <div class="dialog-options">
+          <div class="dialog-label">导入方式：</div>
+          <label class="radio-option">
+            <input type="radio" name="import-mode" value="merge-keep" checked>
+            <span>合并（保留现有）- 推荐</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="import-mode" value="merge-overwrite">
+            <span>合并（覆盖冲突）</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="import-mode" value="replace">
+            <span class="danger">完全覆盖（清空现有数据）</span>
+          </label>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="import-cancel" class="btn btn-secondary">取消</button>
+        <button id="import-confirm" class="btn btn-primary">确认导入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Selection Dialog -->
+  <div id="session-select-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-large">
+      <div class="dialog-header">
+        <span>选择要捕获的会话</span>
+        <div class="dialog-header-actions">
+          <label class="select-all-label">
+            <input type="checkbox" id="session-select-all">
+            <span>全选</span>
+          </label>
+          <span id="session-select-count">已选择 0 个</span>
+        </div>
+      </div>
+      <div class="dialog-body">
+        <div id="session-select-list" class="session-select-list">
+          <!-- Sessions will be populated here -->
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="session-select-cancel" class="btn btn-secondary">取消</button>
+        <button id="session-select-confirm" class="btn btn-primary">开始捕获</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="import-file-input" accept=".json" style="display: none;">
+
+  <!-- Tag Management Dialog -->
+  <div id="tag-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <span id="tag-dialog-title">管理标签</span>
+      </div>
+      <div class="dialog-body">
+        <div class="tag-input-wrapper">
+          <input type="text" id="tag-new-input" placeholder="输入新标签名称..." class="tag-input">
+          <button id="tag-add-btn" class="btn btn-small btn-primary">添加</button>
+        </div>
+        <div id="tag-list" class="tag-list">
+          <!-- Tags will be populated here -->
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="tag-cancel" class="btn btn-secondary">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session View Dialog -->
+  <div id="session-view-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-view">
+      <div class="dialog-header">
+        <span id="session-view-title">会话详情</span>
+        <span id="session-view-meta" class="session-view-meta"></span>
+      </div>
+      <div class="dialog-body session-view-body">
+        <div id="session-view-messages" class="session-view-messages">
+          <!-- Messages will be populated here -->
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="session-view-copy" class="btn btn-secondary">📋 复制全部</button>
+        <button id="session-view-close" class="btn btn-primary">关闭</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

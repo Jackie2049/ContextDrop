@@ -269,7 +269,10 @@ function updateIconForUrl(url?: string) {
     url.includes('yuanbao.tencent.com') ||
     url.includes('claude.ai') ||
     url.includes('deepseek.com') ||
-    url.includes('kimi.com');
+    url.includes('kimi.com') ||
+    url.includes('gemini.google.com') ||
+    url.includes('chatgpt.com') ||
+    url.includes('chat.openai.com');
 
   // Set badge to indicate support status
   if (isSupported) {

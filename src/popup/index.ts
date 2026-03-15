@@ -1153,7 +1153,7 @@ async function handleBatchCaptureStart() {
   // Check if already running locally
   if (isBatchCapturing) {
     const platformNames: Record<Platform, string> = {
-          doubao: '豆包',
+      doubao: '豆包',
       yuanbao: '元宝',
       claude: 'Claude',
       deepseek: 'DeepSeek',

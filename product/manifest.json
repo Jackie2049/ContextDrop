@@ -1,0 +1,97 @@
+{
+  "manifest_version": 3,
+  "name": "OmniContext",
+  "version": "1.0.0",
+  "description": "跨平台AI对话上下文管理工具 - 在不同AI助手间共享记忆",
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+M",
+        "mac": "Command+M"
+      },
+      "description": "打开/关闭 OmniContext 侧边栏"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "nativeMessaging",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://www.doubao.com/*",
+    "https://yuanbao.tencent.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://www.kimi.com/*",
+    "https://gemini.google.com/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "action": {
+    "default_title": "OmniContext - 打开侧边栏",
+    "default_icon": {
+      "16": "icons/icon.svg",
+      "48": "icons/icon.svg",
+      "128": "icons/icon.svg"
+    }
+  },
+  "side_panel": {
+    "default_path": "src/popup/index.html"
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "assets/index.ts-loader-DeIAc9X9.js"
+      ],
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://yuanbao.tencent.com/*",
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.com/*",
+        "https://gemini.google.com/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "icons/platforms/*.svg"
+      ],
+      "use_dynamic_url": false
+    },
+    {
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.doubao.com/*",
+        "https://www.kimi.com/*",
+        "https://yuanbao.tencent.com/*"
+      ],
+      "resources": [
+        "assets/extractor-OfZFsms3.js",
+        "assets/index.ts-CAC4sMEk.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ]
+}
