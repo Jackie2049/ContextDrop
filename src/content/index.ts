@@ -47,15 +47,25 @@ function init() {
     }
 
     // DeepSeek 专用调试
+    // Debug functions available for manual troubleshooting
+    // Uncomment below to enable automatic debug logging on page load
+    /*
     if (currentPlatform === 'deepseek') {
       console.log('[OmniContext] === DeepSeek Debug Start ===');
       console.log('[OmniContext] URL:', url);
-
-      // 分析页面结构
       setTimeout(() => {
         debugDeepSeekPage();
       }, 2000);
     }
+
+    if (currentPlatform === 'doubao') {
+      console.log('[OmniContext] === Doubao Debug Start ===');
+      console.log('[OmniContext] URL:', url);
+      setTimeout(() => {
+        debugDoubaoPage();
+      }, 2000);
+    }
+    */
 
     // First try URL-based extraction
     currentSessionId = extractSessionId(url, currentPlatform);
@@ -167,6 +177,79 @@ function debugDeepSeekPage() {
   console.log('[OmniContext] === DeepSeek Debug End ===');
 }
 
+// 豆包专用调试函数
+function debugDoubaoPage() {
+  console.log('[OmniContext] === Doubao DOM Analysis ===');
+
+  // 1. 检查消息块选择器
+  const selectors = [
+    '[class*="message-block-container"]',
+    '[class*="message-list"]',
+    '[class*="chat-container"]',
+    '[class*="conversation-content"]',
+  ];
+
+  for (const sel of selectors) {
+    const els = document.querySelectorAll(sel);
+    if (els.length > 0) {
+      console.log(`[OmniContext] Found ${els.length} elements with: ${sel}`);
+    }
+  }
+
+  // 2. 检查 bg-s-color-bg-trans 类是否存在
+  const transBgElements = document.querySelectorAll('[class*="bg-s-color-bg-trans"]');
+  console.log(`[OmniContext] bg-s-color-bg-trans elements: ${transBgElements.length}`);
+
+  // 3. 检查其他可能的用户消息标识
+  const userRoleElements = document.querySelectorAll('[data-role="user"]');
+  const userClassElements = document.querySelectorAll('[class*="user-message"]');
+  console.log(`[OmniContext] data-role="user" elements: ${userRoleElements.length}`);
+  console.log(`[OmniContext] class*="user-message" elements: ${userClassElements.length}`);
+
+  // 4. 分析消息块结构
+  const messageBlocks = document.querySelectorAll('[class*="message-block-container"]');
+  console.log(`[OmniContext] Analyzing ${messageBlocks.length} message-block-container elements`);
+
+  messageBlocks.forEach((block, i) => {
+    if (i < 3) { // 只显示前3个
+      const classes = block.className;
+      const hasTransBg = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
+      const hasAvatar = !!block.querySelector('[class*="avatar"], img');
+      const text = block.textContent?.slice(0, 50) || '';
+      console.log(`[OmniContext] [${i}] hasTransBg=${hasTransBg}, hasAvatar=${hasAvatar}`);
+      console.log(`[OmniContext]     class="${classes}"`);
+      console.log(`[OmniContext]     text="${text}..."`);
+    }
+  });
+
+  // 5. 尝试提取消息
+  console.log('[OmniContext] --- Trying message extraction ---');
+  try {
+    const extractor = createMessageExtractor('doubao');
+    const title = extractor.extractTitle();
+    const messages = extractor.extractMessages();
+    console.log(`[OmniContext] Title: "${title}"`);
+    console.log(`[OmniContext] Messages extracted: ${messages.length}`);
+    if (messages.length > 0) {
+      messages.slice(0, 3).forEach((m, i) => {
+        console.log(`[OmniContext] [${i}] ${m.role}: "${m.content.slice(0, 50)}..."`);
+      });
+    } else {
+      console.warn('[OmniContext] ⚠️ No messages extracted - detection may need update');
+    }
+  } catch (e) {
+    console.error('[OmniContext] Extraction error:', e);
+  }
+
+  console.log('[OmniContext] === Doubao Debug End ===');
+}
+
+// Make debug functions available globally for manual console use
+// @ts-expect-error - Intentionally exposing for debugging
+window.debugDeepSeekPage = debugDeepSeekPage;
+// @ts-expect-error - Intentionally exposing for debugging
+window.debugDoubaoPage = debugDoubaoPage;
+
 function startCapturing() {
   log('Starting capture...');
 
@@ -191,7 +274,15 @@ function startCapturing() {
 }
 
 function tryCapture() {
-  if (!currentPlatform || !isExtensionContextValid()) return;
+  if (!currentPlatform) {
+    log('tryCapture: no platform detected');
+    return;
+  }
+
+  if (!isExtensionContextValid()) {
+    log('tryCapture: extension context invalid');
+    return;
+  }
 
   try {
     // For Yuanbao, always re-extract session ID from DOM (URL doesn't change when switching sessions)
@@ -210,7 +301,13 @@ function tryCapture() {
     const extractor = createMessageExtractor(currentPlatform);
     const messages = extractor.extractMessages();
 
-    if (messages.length === 0) return;
+    // Enhanced logging for debugging
+    log(`tryCapture: extracted ${messages.length} messages from ${currentPlatform}`);
+
+    if (messages.length === 0) {
+      log('tryCapture: no messages found - selector may need update');
+      return;
+    }
 
     // Fast comparison: count + hash of last message
     const currentHash = hashMessages(messages);
@@ -222,7 +319,7 @@ function tryCapture() {
       saveSessionDebounced(messages);
     }
   } catch (err) {
-    log('Capture error:', err);
+    console.error('[OmniContext] tryCapture error:', err);
   }
 }
 

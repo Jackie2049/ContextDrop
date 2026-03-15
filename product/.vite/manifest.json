@@ -1,0 +1,43 @@
+{
+  "../../../../../../../@crx/manifest": {
+    "file": "assets/crx-manifest.js-4rx9KYvT.js",
+    "name": "crx-manifest.js",
+    "src": "../../../../../../../@crx/manifest",
+    "isEntry": true
+  },
+  "_extractor-DE4bgtYO.js": {
+    "file": "assets/extractor-DE4bgtYO.js",
+    "name": "extractor"
+  },
+  "_index.ts-loader-CCXlgif_.js": {
+    "file": "assets/index.ts-loader-CCXlgif_.js",
+    "src": "_index.ts-loader-CCXlgif_.js"
+  },
+  "src/background/index.ts": {
+    "file": "assets/index.ts-AqqNQlLF.js",
+    "name": "index.ts",
+    "src": "src/background/index.ts",
+    "isEntry": true
+  },
+  "src/content/index.ts": {
+    "file": "assets/index.ts-D3xGlpHu.js",
+    "name": "index.ts",
+    "src": "src/content/index.ts",
+    "isEntry": true,
+    "imports": [
+      "_extractor-DE4bgtYO.js"
+    ]
+  },
+  "src/popup/index.html": {
+    "file": "assets/popup-CFh3RZb9.js",
+    "name": "popup",
+    "src": "src/popup/index.html",
+    "isEntry": true,
+    "imports": [
+      "_extractor-DE4bgtYO.js"
+    ],
+    "css": [
+      "assets/popup-Briyziwa.css"
+    ]
+  }
+}

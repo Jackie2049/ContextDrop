@@ -23,9 +23,9 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
       'title',
     ],
     messageSelectors: {
-      container: '[class*="message-list"], [class*="chat-container"], [class*="conversation-content"], [class*="message-container"]',
-      user: '[class*="message-block-container"] [class*="bg-s-color-bg-trans"], [class*="user-message"], [data-role="user"]',
-      assistant: '[class*="message-block-container"]:not(:has([class*="bg-s-color-bg-trans"])), [class*="bot-message"], [class*="ai-message"], [data-role="assistant"]',
+      container: '[class*="message-list"], [class*="chat-container"], [class*="conversation-content"], [class*="message-container"], main',
+      user: '[class*="user-message"], [data-role="user"], [class*="message-block-container"]',
+      assistant: '[class*="assistant-message"], [class*="bot-message"], [class*="ai-message"], [data-role="assistant"]',
     },
   },
   yuanbao: {
@@ -73,10 +73,11 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
     ],
     messageSelectors: {
       // DeepSeek uses CSS Modules with hashed class names
-      // ds-message is the stable part, user messages have additional class d29f3d7d
+      // Use semantic partial matches instead of hardcoded hashes
+      // The d29f3d7d hash may change when DeepSeek updates their frontend
       container: '[class*="ds-scroll-area"], main, [class*="chat-container"]',
-      user: '[class*="ds-message"][class*="d29f3d7d"], [class*="ds-chat-message--user"]',
-      assistant: '[class*="ds-message"]:not([class*="d29f3d7d"]), [class*="ds-chat-message--assistant"]',
+      user: '[class*="ds-chat-message--user"], [data-role="user"], [class*="user-message"], [class*="ds-message"]',
+      assistant: '[class*="ds-chat-message--assistant"], [data-role="assistant"], [class*="assistant-message"]',
     },
   },
   kimi: {
@@ -173,6 +174,10 @@ export function extractSessionId(url: string, platform: Platform): string {
 
   // Default: try to find UUID or ID in path
   for (const part of pathParts) {
+    // Special case: 'new' indicates a new chat session
+    if (part === 'new') {
+      return `new-${Date.now()}`;
+    }
     if (part && part !== 'chat' && part !== 'c' && part.length >= 4) {
       return part;
     }
@@ -364,41 +369,69 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractDoubaoMessages(): Message[] {
     const messages: Message[] = [];
 
-    // 尝试多种选择器找到消息块
+    // 尝试多种选择器找到消息块（从最具体到最通用）
     const selectors = [
       '[class*="message-block-container"]',
       '[class*="message-block"]',
       '[class*="chat-message"]',
       '[class*="message-item"]',
       '[class*="msg-container"]',
+      '[class*="bubble"]',
+      '[class*="chat-bubble"]',
+      '[class*="conversation-item"]',
+      '[data-session-id] > div',
+      'main [class*="content"] > div',
     ];
+
+    console.log('[OmniContext] Doubao: Trying selectors...');
 
     let messageBlocks: NodeListOf<Element> | Element[] = [];
     for (const selector of selectors) {
       const elements = document.querySelectorAll(selector);
+      console.log(`[OmniContext] Doubao: ${selector} -> ${elements.length} elements`);
       if (elements.length > 0) {
         messageBlocks = elements;
         break;
       }
     }
 
+    // 如果常规选择器都失败，尝试基于DOM结构查找
     if (messageBlocks.length === 0) {
-      console.warn('[OmniContext] No message blocks found, trying fallback extraction');
+      console.log('[OmniContext] Doubao: Trying DOM-based fallback...');
+      messageBlocks = this.findDoubaoMessageBlocks();
+    }
+
+    if (messageBlocks.length === 0) {
+      console.warn('[OmniContext] Doubao: No message blocks found even with fallback');
       return this.extractMessagesFromDocument();
     }
 
+    console.log(`[OmniContext] Doubao: Found ${messageBlocks.length} message blocks`);
+
     messageBlocks.forEach((block, index) => {
       const fullText = block.textContent || '';
+      const className = (block as Element).className || '';
 
       // 多重检测用户消息的方式
-      // 1. 检查 bg-s-color-bg-trans 类（豆包用户消息标志）
-      const hasUserClass = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
+      // 1. 检查 bg-s-color-bg-trans 类（豆包用户消息标志，可能已失效）
+      const hasTransBgClass = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
 
-      // 2. 检查是否有助手特有的元素（头像、thinking等）
-      const hasAssistantAvatar = !!block.querySelector('[class*="avatar"], [class*="bot-avatar"], [class*="ai-avatar"], img');
+      // 2. 检查语义化的用户标识
+      const hasUserRole = !!block.querySelector('[data-role="user"]');
+      const hasUserClassName = className.toLowerCase().includes('user-message') ||
+                               className.toLowerCase().includes('user');
+
+      // 3. 检查是否有助手特有的元素
+      const hasAssistantAvatar = !!block.querySelector('[class*="avatar"]:not([class*="user"]), [class*="bot-avatar"], [class*="ai-avatar"]');
       const hasThinkingSection = !!block.querySelector('[class*="thinking"], [class*="thought"], [class*="reasoning"]');
 
-      // 3. 根据内容特征判断
+      // 4. 基于内容特征判断（用户消息通常较短，无代码块）
+      const textLength = fullText.length;
+      const hasCodeBlock = !!block.querySelector('pre, code');
+      // 短消息只有在其他用户特征存在时才作为辅助判断
+      const isShortMessage = textLength < 300 && !hasCodeBlock;
+
+      // 5. 根据助手内容特征判断
       const hasAssistantMarkers = fullText.includes('已完成思考') ||
                                    fullText.includes('思考过程') ||
                                    fullText.includes('让我来') ||
@@ -406,10 +439,26 @@ class PlatformMessageExtractor implements MessageExtractor {
                                    fullText.includes('我来分析') ||
                                    fullText.includes('好的') ||
                                    fullText.includes('以下是') ||
-                                   fullText.length > 200; // 助手回复通常较长
+                                   textLength > 500; // 助手回复通常较长
 
-      // 综合判断：如果有助手特征，则不是用户消息
-      const isUserMessage = hasUserClass && !hasAssistantAvatar && !hasThinkingSection && !hasAssistantMarkers;
+      // 综合判断：用户消息的判断条件
+      // 策略：必须有明确的用户标识且没有助手特征
+      const userIndicators = [hasTransBgClass, hasUserRole, hasUserClassName];
+      const assistantIndicators = [hasAssistantAvatar, hasThinkingSection, hasAssistantMarkers];
+
+      const userScore = userIndicators.filter(Boolean).length;
+      const assistantScore = assistantIndicators.filter(Boolean).length;
+
+      // 用户消息：有用户特征且没有助手特征
+      const isUserMessage = userScore > 0 && assistantScore === 0;
+
+      // 调试输出前5个消息块
+      if (index < 5) {
+        console.log(`[OmniContext] Doubao [${index}] class="${className.slice(0, 50)}..."`);
+        console.log(`[OmniContext]   userScore=${userScore} asstScore=${assistantScore} -> ${isUserMessage ? 'USER' : 'ASSISTANT'}`);
+        console.log(`[OmniContext]   indicators: transBg=${hasTransBgClass} role=${hasUserRole} userClass=${hasUserClassName} short=${isShortMessage}`);
+        console.log(`[OmniContext]   text preview: "${fullText.slice(0, 50)}..."`);
+      }
 
       if (isUserMessage) {
         // User message - extract normally
@@ -445,6 +494,99 @@ class PlatformMessageExtractor implements MessageExtractor {
     });
 
     return messages;
+  }
+
+  /**
+   * 基于DOM结构查找豆包消息块（当常规选择器失效时使用）
+   */
+  private findDoubaoMessageBlocks(): Element[] {
+    const blocks: Element[] = [];
+
+    // 方法1: 查找main区域内的直接子元素
+    const main = document.querySelector('main');
+    if (main) {
+      const children = main.querySelectorAll(':scope > div > div');
+      console.log(`[OmniContext] Doubao fallback: main > div > div -> ${children.length} elements`);
+      if (children.length > 0) {
+        children.forEach(child => {
+          const text = child.textContent?.trim() || '';
+          if (text.length > 5) {
+            blocks.push(child);
+          }
+        });
+        if (blocks.length > 0) return blocks;
+      }
+    }
+
+    // 方法2: 查找带有滚动区域的消息容器
+    const scrollContainers = document.querySelectorAll('[class*="scroll"]');
+    for (const container of scrollContainers) {
+      const children = container.querySelectorAll(':scope > div');
+      if (children.length >= 2) { // 至少要有2条消息
+        children.forEach(child => {
+          const text = child.textContent?.trim() || '';
+          if (text.length > 5) {
+            blocks.push(child);
+          }
+        });
+        if (blocks.length > 0) {
+          console.log(`[OmniContext] Doubao fallback: scroll container -> ${blocks.length} elements`);
+          return blocks;
+        }
+      }
+    }
+
+    // 方法3: 查找具有flex布局的消息区域
+    const flexContainers = document.querySelectorAll('[class*="flex-col"], [class*="flexColumn"], [style*="flex-direction: column"]');
+    for (const container of flexContainers) {
+      const directChildren = Array.from(container.children).filter(child => {
+        const text = child.textContent?.trim() || '';
+        // 消息元素通常有合理长度的文本
+        return text.length > 10 && text.length < 10000;
+      });
+
+      if (directChildren.length >= 2) {
+        console.log(`[OmniContext] Doubao fallback: flex container -> ${directChildren.length} elements`);
+        return directChildren;
+      }
+    }
+
+    // 方法4: 查找包含对话内容的区域
+    const allDivs = document.querySelectorAll('div');
+    const candidates = new Map<Element, number>();
+
+    allDivs.forEach(div => {
+      const text = div.textContent?.trim() || '';
+      // 跳过太短或太长的内容
+      if (text.length < 20 || text.length > 20000) return;
+
+      // 检查子元素数量 - 消息块通常子元素较少
+      const childCount = div.children.length;
+      if (childCount > 10) return; // 太多子元素，可能是容器
+
+      // 检查是否包含消息特征
+      const classList = (div.className || '').toLowerCase();
+      const hasMessageClass = classList.includes('message') ||
+                              classList.includes('chat') ||
+                              classList.includes('bubble') ||
+                              classList.includes('content');
+
+      if (hasMessageClass) {
+        candidates.set(div, text.length);
+      }
+    });
+
+    if (candidates.size > 0) {
+      // 按文本长度排序，取前几个
+      const sorted = Array.from(candidates.entries())
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, 20)
+        .map(([el]) => el);
+      console.log(`[OmniContext] Doubao fallback: generic search -> ${sorted.length} elements`);
+      return sorted;
+    }
+
+    return blocks;
   }
 
   private extractDoubaoAssistantContent(element: Element): string {
@@ -996,20 +1138,29 @@ class PlatformMessageExtractor implements MessageExtractor {
 
       console.log(`[OmniContext] [${index}] class="${className.slice(0, 50)}" text="${fullText.slice(0, 50)}..."`);
 
-      // 判断是否为用户消息
+      // 判断是否为用户消息 - 使用多种启发式方法
       const hasThinkingContent = !!msgEl.querySelector('[class*="ds-think-content"], [class*="think"], [class*="reasoning"]');
-      const hasUserClass = className.includes('d29f3d7d') ||
-                          className.includes('user') ||
-                          className.includes('human') ||
-                          className.includes('me') ||
-                          msgEl.hasAttribute('data-user');
 
-      // 简单的交替判断（如果没有明确的用户标识）
-      // 用户消息通常较短
-      const isShortMessage = fullText.length < 200;
-      const isLikelyUser = hasUserClass || (isShortMessage && index % 2 === 0);
+      // 检查语义化的用户标识（不依赖CSS Modules哈希）
+      const hasUserClass = className.toLowerCase().includes('user') ||
+                          className.toLowerCase().includes('human') ||
+                          className.toLowerCase().includes('me') ||
+                          msgEl.hasAttribute('data-user') ||
+                          msgEl.hasAttribute('data-role') && msgEl.getAttribute('data-role') === 'user';
 
-      const isUserMessage = isLikelyUser && !hasThinkingContent;
+      // 检查是否有助手特有的元素
+      const hasAssistantAvatar = !!msgEl.querySelector('[class*="avatar"]:not([class*="user"])');
+      const hasCodeBlock = !!msgEl.querySelector('pre, code');
+      const hasMarkdownContent = fullText.includes('```') || fullText.includes('###');
+
+      // 基于结构特征判断用户消息
+      // 用户消息通常：较短、没有代码块、没有 Markdown 格式
+      const isShortMessage = fullText.length < 300;
+      const isLikelyUser = hasUserClass ||
+                          (isShortMessage && !hasCodeBlock && !hasMarkdownContent && index % 2 === 0);
+
+      // 如果有思考内容或助手特征，则不是用户消息
+      const isUserMessage = isLikelyUser && !hasThinkingContent && !hasAssistantAvatar;
 
       if (isUserMessage) {
         const content = this.extractDeepseekUserContent(msgEl);

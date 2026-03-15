@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "OmniContext",
+  "version": "1.0.0",
+  "description": "跨平台AI对话上下文管理工具 - 在不同AI助手间共享记忆",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.doubao.com/*",
+    "https://yuanbao.tencent.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://www.kimi.com/*"
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon.svg",
+      "48": "icons/icon.svg",
+      "128": "icons/icon.svg"
+    }
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "assets/index.ts-loader-CCXlgif_.js"
+      ],
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://yuanbao.tencent.com/*",
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  },
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "icons/platforms/*.svg"
+      ],
+      "use_dynamic_url": false
+    },
+    {
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://claude.ai/*",
+        "https://www.doubao.com/*",
+        "https://www.kimi.com/*",
+        "https://yuanbao.tencent.com/*"
+      ],
+      "resources": [
+        "assets/extractor-DE4bgtYO.js",
+        "assets/index.ts-D3xGlpHu.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ]
+}
