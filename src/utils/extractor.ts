@@ -1774,8 +1774,48 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     console.log('[OmniContext] ChatGPT: Trying fallback document extraction...');
 
-    // Find all article or div elements that might be messages
-    const candidates = document.querySelectorAll('article, [role="article"], main > div > div');
+    // Strategy 1: Look for elements with data-message-author-role
+    const userByRole = document.querySelectorAll('[data-message-author-role="user"]');
+    const assistantByRole = document.querySelectorAll('[data-message-author-role="assistant"]');
+
+    console.log(`[OmniContext] ChatGPT fallback: Found ${userByRole.length} user, ${assistantByRole.length} assistant by role`);
+
+    if (userByRole.length > 0 || assistantByRole.length > 0) {
+      // Combine and sort by DOM position
+      const allMessages: Array<{ el: Element; role: 'user' | 'assistant'; index: number }> = [];
+
+      userByRole.forEach((el, i) => {
+        allMessages.push({ el, role: 'user', index: i });
+      });
+
+      assistantByRole.forEach((el, i) => {
+        allMessages.push({ el, role: 'assistant', index: i });
+      });
+
+      // Sort by their position in the document
+      allMessages.sort((a, b) => {
+        const posA = a.el.compareDocumentPosition(b.el);
+        return posA & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+
+      allMessages.forEach((msg, index) => {
+        const content = this.extractChatgptMessageContent(msg.el);
+        if (content.length >= 1) {
+          messages.push({
+            id: `chatgpt-role-${index}`,
+            role: msg.role,
+            content,
+            timestamp: Date.now(),
+          });
+        }
+      });
+
+      console.log(`[OmniContext] ChatGPT role-based: Extracted ${messages.length} messages`);
+      return messages;
+    }
+
+    // Strategy 2: Look for article elements or main content containers
+    const candidates = document.querySelectorAll('main article, [data-testid^="conversation-turn-"], .group, [class*="conversation-item"]');
 
     console.log(`[OmniContext] ChatGPT fallback: Found ${candidates.length} candidates`);
 
@@ -1809,6 +1849,29 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     console.log(`[OmniContext] ChatGPT fallback: Extracted ${messages.length} messages`);
     return messages;
+  }
+
+  private extractChatgptMessageContent(el: Element): string {
+    // Try to find the actual message content
+    const contentSelectors = [
+      '[class*="markdown"]',
+      '[class*="prose"]',
+      '.whitespace-pre-wrap',
+      '[class*="text-message"]',
+      'div > div',  // Nested divs often contain the content
+    ];
+
+    for (const selector of contentSelectors) {
+      const contentEl = el.querySelector(selector);
+      if (contentEl?.textContent?.trim()) {
+        return this.cleanChatgptContent(contentEl.textContent.trim());
+      }
+    }
+
+    // Fallback: get text from the element itself, removing buttons
+    const clone = el.cloneNode(true) as Element;
+    clone.querySelectorAll('button, svg, [class*="copy"], [class*="feedback"]').forEach(e => e.remove());
+    return this.cleanChatgptContent(clone.textContent?.trim() || '');
   }
 
   private extractMessagesFromDocument(): Message[] {
