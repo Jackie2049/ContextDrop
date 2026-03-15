@@ -1125,6 +1125,16 @@ export class BatchCapture {
 
   protected async captureCurrentSession(): Promise<{ session: Session; isNew: boolean; isUpdated: boolean; oldCount: number } | null> {
     try {
+      const url = window.location.href;
+
+      // ChatGPT: 跳过 "新聊天" 页面
+      if (this.platform === 'chatgpt') {
+        if (url.includes('/c/new') || url.endsWith('/chat') || url.endsWith('/chat/')) {
+          console.log('[OmniContext] Skipping ChatGPT new chat page:', url);
+          return null;
+        }
+      }
+
       const extractor = createMessageExtractor(this.platform);
       const messages = extractor.extractMessages();
       const title = extractor.extractTitle();
@@ -1137,7 +1147,6 @@ export class BatchCapture {
       }
 
       // 提取 session ID
-      const url = window.location.href;
       let sessionId: string;
 
       // 对于元宝，使用 DOM 提取会话ID（URL 不包含会话ID）
@@ -1202,7 +1211,7 @@ export class BatchCapture {
     const pathParts = urlObj.pathname.split('/').filter(p => p.length > 0);
 
     for (const part of pathParts) {
-      if (part && part !== 'chat' && part !== 'c' && part.length >= 4) {
+      if (part && part !== 'chat' && part !== 'c' && part !== 'new' && part.length >= 4) {
         return part;
       }
     }
@@ -2768,15 +2777,23 @@ export class BatchCapture {
       // 匹配 /c/{id} 格式
       const cMatch = href.match(/\/c\/([a-zA-Z0-9-]+)/);
       if (cMatch) {
-        console.log(`[OmniContext] ChatGPT: Extracted session ID from href (c format): ${cMatch[1]}`);
-        return cMatch[1];
+        const sessionId = cMatch[1];
+        // 过滤掉无效ID（如 "new"）
+        if (sessionId && sessionId !== 'new' && sessionId.length > 4) {
+          console.log(`[OmniContext] ChatGPT: Extracted session ID from href (c format): ${sessionId}`);
+          return sessionId;
+        }
       }
 
       // 匹配 /chat/{id} 格式
       const chatMatch = href.match(/\/chat\/([a-zA-Z0-9-]+)/);
       if (chatMatch) {
-        console.log(`[OmniContext] ChatGPT: Extracted session ID from href (chat format): ${chatMatch[1]}`);
-        return chatMatch[1];
+        const sessionId = chatMatch[1];
+        // 过滤掉无效ID
+        if (sessionId && sessionId !== 'new' && sessionId.length > 4) {
+          console.log(`[OmniContext] ChatGPT: Extracted session ID from href (chat format): ${sessionId}`);
+          return sessionId;
+        }
       }
     }
 
@@ -2784,7 +2801,7 @@ export class BatchCapture {
     const dataId = element.getAttribute('data-id') ||
                    element.getAttribute('data-session-id') ||
                    element.getAttribute('data-conversation-id');
-    if (dataId) {
+    if (dataId && dataId.length > 4) {
       console.log(`[OmniContext] ChatGPT: Extracted session ID from data attribute: ${dataId}`);
       return dataId;
     }
