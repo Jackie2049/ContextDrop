@@ -411,62 +411,89 @@ class PlatformMessageExtractor implements MessageExtractor {
     messageBlocks.forEach((block, index) => {
       const fullText = block.textContent || '';
       const className = (block as Element).className || '';
+      const classListLower = className.toLowerCase();
 
       // 多重检测用户消息的方式
       // 1. 检查 bg-s-color-bg-trans 类（豆包用户消息标志，可能已失效）
       const hasTransBgClass = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
 
-      // 2. 检查语义化的用户标识
+      // 2. 检查语义化的用户标识（扩展列表）
       const hasUserRole = !!block.querySelector('[data-role="user"]');
-      const hasUserClassName = className.toLowerCase().includes('user-message') ||
-                               className.toLowerCase().includes('user');
+      const hasUserClassName = classListLower.includes('user-message') ||
+                               classListLower.includes('user') ||
+                               classListLower.includes('self');
 
-      // 3. 检查是否有助手特有的元素
+      // 3. 检查布局特征（用户消息通常在右侧或有特定flex方向）
+      const computedStyle = window.getComputedStyle(block as Element);
+      const hasUserAlignment = computedStyle.justifyContent === 'flex-end' ||
+                               computedStyle.alignSelf === 'flex-end';
+
+      // 4. 检查是否有助手特有的元素
       const hasAssistantAvatar = !!block.querySelector('[class*="avatar"]:not([class*="user"]), [class*="bot-avatar"], [class*="ai-avatar"]');
       const hasThinkingSection = !!block.querySelector('[class*="thinking"], [class*="thought"], [class*="reasoning"]');
+      const hasAssistantRole = !!block.querySelector('[data-role="assistant"]');
 
-      // 4. 基于内容特征判断（用户消息通常较短，无代码块）
+      // 5. 基于内容特征判断（用户消息通常较短，无代码块）
       const textLength = fullText.length;
       const hasCodeBlock = !!block.querySelector('pre, code');
-      // 短消息只有在其他用户特征存在时才作为辅助判断
-      const isShortMessage = textLength < 300 && !hasCodeBlock;
 
-      // 5. 根据助手内容特征判断
+      // 6. 根据助手内容特征判断
       const hasAssistantMarkers = fullText.includes('已完成思考') ||
                                    fullText.includes('思考过程') ||
                                    fullText.includes('让我来') ||
                                    fullText.includes('我来帮你') ||
                                    fullText.includes('我来分析') ||
-                                   fullText.includes('好的') ||
                                    fullText.includes('以下是') ||
-                                   textLength > 500; // 助手回复通常较长
+                                   (textLength > 500 && hasCodeBlock); // 长回复且有代码块
 
       // 综合判断：用户消息的判断条件
-      // 策略：必须有明确的用户标识且没有助手特征
-      const userIndicators = [hasTransBgClass, hasUserRole, hasUserClassName];
-      const assistantIndicators = [hasAssistantAvatar, hasThinkingSection, hasAssistantMarkers];
+      // 策略：使用评分系统，综合考虑多种因素
+      const userIndicators = [hasTransBgClass, hasUserRole, hasUserClassName, hasUserAlignment];
+      const assistantIndicators = [hasAssistantAvatar, hasThinkingSection, hasAssistantRole, hasAssistantMarkers];
 
       const userScore = userIndicators.filter(Boolean).length;
       const assistantScore = assistantIndicators.filter(Boolean).length;
 
-      // 用户消息：有用户特征且没有助手特征
-      const isUserMessage = userScore > 0 && assistantScore === 0;
+      // 用户消息：有用户特征且助手特征很少
+      // 如果都没有明显特征，使用交替模式判断
+      let isUserMessage: boolean;
+      if (userScore > 0 && assistantScore === 0) {
+        isUserMessage = true;
+      } else if (assistantScore > 0 && userScore === 0) {
+        isUserMessage = false;
+      } else {
+        // 模糊情况：使用交替模式（第一条通常是用户，然后交替）
+        // 但这需要全局上下文，这里简化处理
+        isUserMessage = userScore >= assistantScore;
+      }
 
       // 调试输出前5个消息块
       if (index < 5) {
         console.log(`[OmniContext] Doubao [${index}] class="${className.slice(0, 50)}..."`);
         console.log(`[OmniContext]   userScore=${userScore} asstScore=${assistantScore} -> ${isUserMessage ? 'USER' : 'ASSISTANT'}`);
-        console.log(`[OmniContext]   indicators: transBg=${hasTransBgClass} role=${hasUserRole} userClass=${hasUserClassName} short=${isShortMessage}`);
+        console.log(`[OmniContext]   user indicators: transBg=${hasTransBgClass} role=${hasUserRole} userClass=${hasUserClassName} alignment=${hasUserAlignment}`);
+        console.log(`[OmniContext]   asst indicators: avatar=${hasAssistantAvatar} thinking=${hasThinkingSection} asstRole=${hasAssistantRole}`);
         console.log(`[OmniContext]   text preview: "${fullText.slice(0, 50)}..."`);
       }
 
       if (isUserMessage) {
-        // User message - extract normally
-        const contentElement = block.querySelector('[class*="container-"]') ||
-                               block.querySelector('[class*="message-content"]') ||
-                               block.querySelector('[class*="content"]') ||
-                               block;
-        const content = this.extractTextContent(contentElement);
+        // User message - try multiple content selectors
+        const contentSelectors = [
+          '[class*="container-"]',
+          '[class*="message-content"]',
+          '[class*="content"]',
+          '[class*="text"]',
+          '[class*="message-body"]',
+          '[class*="bubble"]',
+        ];
+
+        let contentElement: Element | null = null;
+        for (const sel of contentSelectors) {
+          contentElement = block.querySelector(sel);
+          if (contentElement) break;
+        }
+
+        const content = this.extractTextContent(contentElement || block);
         if (content && content.length > 0) {
           messages.push({
             id: `doubao-msg-${index}`,
@@ -477,11 +504,22 @@ class PlatformMessageExtractor implements MessageExtractor {
         }
       } else {
         // Assistant message
-        const contentElement = block.querySelector('[class*="container-"]') ||
-                               block.querySelector('[class*="message-content"]') ||
-                               block.querySelector('[class*="content"]') ||
-                               block;
-        const content = this.extractDoubaoAssistantContent(contentElement);
+        const contentSelectors = [
+          '[class*="container-"]',
+          '[class*="message-content"]',
+          '[class*="content"]',
+          '[class*="text"]',
+          '[class*="message-body"]',
+          '[class*="bubble"]',
+        ];
+
+        let contentElement: Element | null = null;
+        for (const sel of contentSelectors) {
+          contentElement = block.querySelector(sel);
+          if (contentElement) break;
+        }
+
+        const content = this.extractDoubaoAssistantContent(contentElement || block);
         if (content && content.length > 0) {
           messages.push({
             id: `doubao-msg-${index}`,
@@ -551,7 +589,23 @@ class PlatformMessageExtractor implements MessageExtractor {
       }
     }
 
-    // 方法4: 查找包含对话内容的区域
+    // 方法4: 查找所有可能的消息容器
+    const messageContainers = document.querySelectorAll('[class*="conversation"] [class*="content"], [class*="chat"] [class*="content"]');
+    for (const container of messageContainers) {
+      const children = container.children;
+      if (children.length >= 2) {
+        const validChildren = Array.from(children).filter(child => {
+          const text = child.textContent?.trim() || '';
+          return text.length > 5;
+        });
+        if (validChildren.length > 0) {
+          console.log(`[OmniContext] Doubao fallback: conversation content -> ${validChildren.length} elements`);
+          return validChildren;
+        }
+      }
+    }
+
+    // 方法5: 查找包含对话内容的区域（改进版）
     const allDivs = document.querySelectorAll('div');
     const candidates = new Map<Element, number>();
 

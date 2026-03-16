@@ -46,10 +46,8 @@ function init() {
       return;
     }
 
-    // DeepSeek 专用调试
-    // Debug functions available for manual troubleshooting
-    // Uncomment below to enable automatic debug logging on page load
-    /*
+    // DeepSeek / Doubao 专用调试
+    // 启用自动调试日志以帮助诊断问题
     if (currentPlatform === 'deepseek') {
       console.log('[OmniContext] === DeepSeek Debug Start ===');
       console.log('[OmniContext] URL:', url);
@@ -63,9 +61,8 @@ function init() {
       console.log('[OmniContext] URL:', url);
       setTimeout(() => {
         debugDoubaoPage();
-      }, 2000);
+      }, 3000); // 稍长延迟确保页面完全加载
     }
-    */
 
     // First try URL-based extraction
     currentSessionId = extractSessionId(url, currentPlatform);
@@ -181,49 +178,94 @@ function debugDeepSeekPage() {
 function debugDoubaoPage() {
   console.log('[OmniContext] === Doubao DOM Analysis ===');
 
-  // 1. 检查消息块选择器
+  // 1. 检查消息块选择器（扩展列表）
+  console.log('[OmniContext] --- Step 1: Checking message selectors ---');
   const selectors = [
     '[class*="message-block-container"]',
+    '[class*="message-block"]',
     '[class*="message-list"]',
     '[class*="chat-container"]',
     '[class*="conversation-content"]',
+    '[class*="chat-content"]',
+    '[class*="message-item"]',
+    '[class*="msg-container"]',
+    '[class*="bubble"]',
+    '[class*="chat-bubble"]',
+    '[data-index]',
+    '[data-session-id] > div',
   ];
 
   for (const sel of selectors) {
     const els = document.querySelectorAll(sel);
     if (els.length > 0) {
-      console.log(`[OmniContext] Found ${els.length} elements with: ${sel}`);
+      console.log(`[OmniContext] ✓ ${sel} -> ${els.length} elements`);
+      // Show first element details
+      if (els[0]) {
+        console.log(`[OmniContext]   First element class: "${els[0].className}"`);
+      }
     }
   }
 
-  // 2. 检查 bg-s-color-bg-trans 类是否存在
-  const transBgElements = document.querySelectorAll('[class*="bg-s-color-bg-trans"]');
-  console.log(`[OmniContext] bg-s-color-bg-trans elements: ${transBgElements.length}`);
+  // 2. 检查用户消息标识（扩展列表）
+  console.log('[OmniContext] --- Step 2: Checking user message indicators ---');
+  const userIndicators = [
+    { name: 'bg-s-color-bg-trans', selector: '[class*="bg-s-color-bg-trans"]' },
+    { name: 'data-role="user"', selector: '[data-role="user"]' },
+    { name: 'user-message class', selector: '[class*="user-message"]' },
+    { name: 'message-user class', selector: '[class*="message-user"]' },
+    { name: 'chat-user class', selector: '[class*="chat-user"]' },
+  ];
 
-  // 3. 检查其他可能的用户消息标识
-  const userRoleElements = document.querySelectorAll('[data-role="user"]');
-  const userClassElements = document.querySelectorAll('[class*="user-message"]');
-  console.log(`[OmniContext] data-role="user" elements: ${userRoleElements.length}`);
-  console.log(`[OmniContext] class*="user-message" elements: ${userClassElements.length}`);
+  for (const indicator of userIndicators) {
+    const els = document.querySelectorAll(indicator.selector);
+    console.log(`[OmniContext] ${indicator.name}: ${els.length} elements`);
+  }
 
-  // 4. 分析消息块结构
-  const messageBlocks = document.querySelectorAll('[class*="message-block-container"]');
-  console.log(`[OmniContext] Analyzing ${messageBlocks.length} message-block-container elements`);
+  // 3. 分析页面主结构
+  console.log('[OmniContext] --- Step 3: Analyzing page structure ---');
+  const main = document.querySelector('main');
+  console.log(`[OmniContext] Main element: ${main ? 'found' : 'not found'}`);
+  if (main) {
+    console.log(`[OmniContext] Main children: ${main.children.length}`);
+    // Try to find message containers
+    const allDivs = main.querySelectorAll('div');
+    console.log(`[OmniContext] Total divs in main: ${allDivs.length}`);
 
-  messageBlocks.forEach((block, i) => {
-    if (i < 3) { // 只显示前3个
-      const classes = block.className;
-      const hasTransBg = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
-      const hasAvatar = !!block.querySelector('[class*="avatar"], img');
-      const text = block.textContent?.slice(0, 50) || '';
-      console.log(`[OmniContext] [${i}] hasTransBg=${hasTransBg}, hasAvatar=${hasAvatar}`);
-      console.log(`[OmniContext]     class="${classes}"`);
-      console.log(`[OmniContext]     text="${text}..."`);
+    // Look for scrollable containers
+    const scrollContainers = main.querySelectorAll('[class*="scroll"], [style*="overflow"]');
+    console.log(`[OmniContext] Scroll containers in main: ${scrollContainers.length}`);
+  }
+
+  // 4. 分析消息块结构（如果找到）
+  console.log('[OmniContext] --- Step 4: Analyzing message blocks ---');
+  const messageBlocks = document.querySelectorAll('[class*="message-block-container"], [class*="message-item"], [data-index]');
+  console.log(`[OmniContext] Found ${messageBlocks.length} potential message blocks`);
+
+  if (messageBlocks.length > 0) {
+    messageBlocks.forEach((block, i) => {
+      if (i < 5) { // 显示前5个
+        const classes = block.className;
+        const text = block.textContent?.slice(0, 80) || '';
+        const hasTransBg = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
+        const hasAvatar = !!block.querySelector('[class*="avatar"], img');
+        const hasImg = !!block.querySelector('img');
+        console.log(`[OmniContext] [${i}] Text: "${text}..."`);
+        console.log(`[OmniContext]      Class: "${classes?.slice(0, 60)}"`);
+        console.log(`[OmniContext]      transBg=${hasTransBg}, avatar=${hasAvatar}, img=${hasImg}`);
+      }
+    });
+  } else {
+    // 如果没有找到消息块，输出一些HTML帮助调试
+    console.log('[OmniContext] ⚠️ No message blocks found. Dumping main HTML:');
+    if (main) {
+      console.log(main.innerHTML.slice(0, 2000));
+    } else {
+      console.log(document.body.innerHTML.slice(0, 2000));
     }
-  });
+  }
 
   // 5. 尝试提取消息
-  console.log('[OmniContext] --- Trying message extraction ---');
+  console.log('[OmniContext] --- Step 5: Trying message extraction ---');
   try {
     const extractor = createMessageExtractor('doubao');
     const title = extractor.extractTitle();
@@ -231,8 +273,8 @@ function debugDoubaoPage() {
     console.log(`[OmniContext] Title: "${title}"`);
     console.log(`[OmniContext] Messages extracted: ${messages.length}`);
     if (messages.length > 0) {
-      messages.slice(0, 3).forEach((m, i) => {
-        console.log(`[OmniContext] [${i}] ${m.role}: "${m.content.slice(0, 50)}..."`);
+      messages.slice(0, 5).forEach((m, i) => {
+        console.log(`[OmniContext] [${i}] ${m.role}: "${m.content.slice(0, 60)}..."`);
       });
     } else {
       console.warn('[OmniContext] ⚠️ No messages extracted - detection may need update');

@@ -4,6 +4,67 @@
 
 ---
 
+## 2026-03-16 豆包自动捕获问题修复
+
+**摘要：** 修复豆包平台自动捕获失效问题，增强DOM选择器健壮性
+
+**正文：**
+
+### 问题诊断
+1. **现象**：豆包平台会话自动捕获无法正常工作
+2. **根因**：豆包页面DOM结构更新，原有选择器失效
+   - `bg-s-color-bg-trans` 类名可能已变更
+   - 消息容器选择器不够全面
+
+### 修复内容
+
+#### 1. 增强调试功能 (`src/content/index.ts`)
+- 启用自动调试日志（页面加载3秒后自动执行）
+- 扩展 `debugDoubaoPage()` 函数：
+  - 12种消息容器选择器检测
+  - 5种用户消息标识检测
+  - 页面主结构分析（main元素、滚动容器）
+  - 自动HTML结构dump（当未找到消息块时）
+
+#### 2. 改进消息块查找 (`src/utils/extractor.ts`)
+- 扩展 `findDoubaoMessageBlocks()` 方法：
+  - 新增方法4：搜索 conversation/chat content 容器
+  - 改进方法5：更多消息类名模式匹配
+  - 支持 `data-index` 属性选择器（虚拟列表常见）
+
+#### 3. 优化用户消息检测
+- 新增布局特征检测（flex对齐方式）
+- 扩展用户标识检查：
+  - `[data-role="user"]`
+  - `[class*="user-message"]`
+  - `[class*="message-user"]`
+  - `[class*="chat-user"]`
+  - `justify-content: flex-end`
+- 新增助手标识：`[data-role="assistant"]`
+- 改进评分系统：模糊情况使用评分比较而非硬判断
+
+#### 4. 增强内容提取
+- 扩展内容选择器至6种模式：
+  - `[class*="container-"]`
+  - `[class*="message-content"]`
+  - `[class*="content"]`
+  - `[class*="text"]`
+  - `[class*="message-body"]`
+  - `[class*="bubble"]`
+- 迭代选择器匹配策略（首个匹配即使用）
+
+### 技术要点
+- **多选择器策略**：从具体到通用，逐级回退
+- **评分系统**：用户特征 vs 助手特征评分，处理模糊情况
+- **自动调试**：页面加载自动输出诊断信息，便于远程排查
+- **布局检测**：利用CSS计算属性（getComputedStyle）辅助判断
+
+### 文件修改
+- `src/content/index.ts` - 启用自动调试，增强debug函数
+- `src/utils/extractor.ts` - 改进提取逻辑和回退机制
+
+---
+
 ## 2026-03-05 Kimi 平台适配
 
 **摘要：** 完成 Kimi (kimi.com) 平台适配，支持消息捕获和批量捕获功能
