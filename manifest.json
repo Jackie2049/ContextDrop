@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "OmniContext",
+  "name": "🧠 OmniContext",
   "version": "1.0.0",
   "description": "跨平台AI对话上下文管理工具 - 在不同AI助手间共享记忆",
   "commands": {
@@ -33,7 +33,8 @@
     "default_icon": {
       "16": "icons/icon.svg",
       "48": "icons/icon.svg",
-      "128": "icons/icon.svg"
+      "128": "icons/icon.svg",
+      "256": "icons/icon.svg"
     }
   },
   "side_panel": {
