@@ -4,6 +4,70 @@
 
 ---
 
+## 2026-03-19 Side Panel 标题栏图标（尝试中）
+
+**摘要：** 尝试让 Chrome Side Panel 顶部标题栏显示自定义图标和名称
+
+**正文：**
+
+### 目标
+让 Side Panel 顶部标题栏显示 `🧠 OmniContext` 和自定义图标，类似豆包插件的效果。
+
+### 已尝试的方案
+
+#### 1. 修改 manifest.json 的 name 字段
+```json
+{
+  "name": "🧠 OmniContext"
+}
+```
+**结果：** ❌ 标题栏仍显示默认图标
+
+#### 2. 添加 side_panel.default_icon 配置
+```json
+{
+  "side_panel": {
+    "default_path": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon.svg",
+      "48": "icons/icon.svg",
+      "128": "icons/icon.svg",
+      "256": "icons/icon.svg"
+    }
+  }
+}
+```
+**结果：** ❌ 标题栏仍显示默认图标
+
+#### 3. 添加 256px 图标尺寸
+在 `icons` 和 `action.default_icon` 中添加 256px 尺寸支持。
+
+**结果：** ❌ 标题栏仍显示默认图标
+
+### 技术分析
+
+Chrome Side Panel 的标题栏由 Chrome 浏览器控制，扩展开发者无法完全自定义。可能的原因：
+
+1. **Chrome 版本差异**：不同版本的 Chrome 对 Side Panel 标题栏的渲染方式不同
+2. **SVG 图标限制**：Chrome 可能不支持 SVG 格式的 Side Panel 图标，需要 PNG
+3. **缓存问题**：Chrome 可能缓存了扩展图标，需要完全卸载重装
+4. **API 限制**：Chrome Side Panel API 可能不支持完全自定义标题栏图标
+
+### 下一步尝试方向
+
+1. 将 SVG 图标转换为 PNG 格式（16x16, 48x48, 128x128, 256x256）
+2. 完全卸载扩展后重新安装
+3. 检查 Chrome 版本是否支持 Side Panel 图标自定义
+4. 研究豆包插件的 manifest 配置
+
+### 修改的文件
+- `manifest.json` - 添加 🧠 emoji 到名称，添加 side_panel.default_icon
+- `src/utils/extractor.ts` - 修复构建错误（类型问题）
+
+**状态：** 🔴 未解决，需要进一步研究
+
+---
+
 ## 2026-03-18 ChatGPT显示名称修复（第三轮 - 数据规范化）
 
 **摘要：** 修复会话列表中ChatGPT会话仍然分组在 "CHATGPT" 下的问题
