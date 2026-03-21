@@ -288,13 +288,20 @@ async function toggleAutoCapture(): Promise<void> {
 
 // Update current assistant card display
 function updateCurrentAssistantCard(platform: Platform | null, isConnected: boolean = false): void {
+  // Always show the card
+  currentAssistantCard.style.display = 'block';
+
   if (!platform) {
-    currentAssistantCard.style.display = 'none';
+    // Show unknown state
+    assistantPlatformThumb.style.background = 'rgba(0,0,0,0.05)';
+    assistantPlatformIcon.src = chrome.runtime.getURL('icons/unknown.svg');
+    assistantPlatformIcon.alt = '未检测到';
+    assistantPlatformName.textContent = '未检测到AI助手';
+    assistantStatusDot.classList.remove('connected');
+    assistantStatusText.classList.remove('connected');
+    assistantStatusText.textContent = '请打开支持的AI平台';
     return;
   }
-
-  // Show the card
-  currentAssistantCard.style.display = 'block';
 
   // Update platform icon (transparent background)
   assistantPlatformThumb.style.background = 'transparent';
