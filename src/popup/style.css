@@ -113,10 +113,10 @@ body {
 /* Current Assistant Card */
 .active-context-card {
   flex-shrink: 0;
-  margin: 0 16px 12px;
+  margin: 12px;
   background: var(--surface-bg);
   border-radius: var(--radius-card);
-  padding: 16px;
+  padding: 12px;
   box-shadow: var(--shadow-base);
 }
 
@@ -239,7 +239,7 @@ body {
 /* Search Container */
 .search-container {
   flex-shrink: 0;
-  padding: 12px 16px 16px;
+  padding: 0 12px 12px;
   background: transparent;
 }
 
@@ -412,7 +412,7 @@ body {
 
 /* Session List */
 .session-list {
-  padding: 8px;
+  padding: 0 12px 12px;
 }
 
 .platform-group {
@@ -455,7 +455,7 @@ body {
   display: flex;
   align-items: center;
   padding: 12px;
-  margin: 8px 0;
+  margin: 6px 0;
   background: var(--surface-bg);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-base);
