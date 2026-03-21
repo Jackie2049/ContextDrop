@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-03-21 首次使用引导对话框 + 按钮布局优化
+
+**摘要：** 实现首次使用引导对话框，优化按钮布局和样式
+
+**正文：**
+
+### 实现内容
+
+#### 1. 首次使用引导对话框（Onboarding Dialog）
+- 新用户首次打开扩展时显示引导对话框
+- 三步骤引导：
+  1. 打开AI平台 - 访问豆包、ChatGPT等
+  2. 开启自动捕获 - 点击「自动捕获」按钮，持续捕获AI记忆
+  3. 批量捕获会话 - 点击「批量捕获」按钮，扫描全部历史对话，无缝迁移AI记忆
+- 「不再提示」复选框，勾选后不再显示引导
+- 引导状态存储在 `chrome.storage.local` 的 `onboarding_completed` 字段
+
+#### 2. 按钮布局优化
+- 自动捕获按钮移至左侧，批量捕获按钮移至右侧
+- 自动捕获使用 secondary 样式（active 时显示 copper 色）
+- 批量捕获使用 primary 样式（黑色）
+
+### 修改的文件
+- `src/popup/index.html` - 添加 onboarding dialog HTML，调整按钮顺序和样式
+- `src/popup/index.ts` - 添加 onboarding 逻辑（DOM 引用、事件绑定、检查函数）
+- `src/popup/style.css` - 添加 onboarding 对话框样式
+
+### 技术细节
+- `checkAndShowOnboarding()` - 检查是否需要显示引导（无会话且未标记完成）
+- `showOnboardingDialog()` / `closeOnboardingDialog()` - 显示/隐藏引导对话框
+- 引导完成后如勾选「不再提示」，写入 `onboarding_completed: true`
+
+**状态：** ✅ 已完成
+
+---
+
 ## 2026-03-19 Side Panel 标题栏图标（尝试中）
 
 **摘要：** 尝试让 Chrome Side Panel 顶部标题栏显示自定义图标和名称
