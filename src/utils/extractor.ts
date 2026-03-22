@@ -449,8 +449,10 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractDoubaoMessages(): Message[] {
     const messages: Message[] = [];
 
-    // 尝试多种选择器找到消息块
+    // 豆包 2026 新版 DOM 结构选择器
     const selectors = [
+      '[class*="inner-item"]',  // 新版消息项
+      '[class*="container-Pv"]',  // 新版消息容器
       '[class*="message-block-container"]',
       '[class*="message-block"]',
       '[class*="chat-message"]',
@@ -463,6 +465,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       const elements = document.querySelectorAll(selector);
       if (elements.length > 0) {
         messageBlocks = elements;
+        console.log(`[OmniContext] Doubao: found ${elements.length} elements with selector: ${selector}`);
         break;
       }
     }
@@ -473,34 +476,18 @@ class PlatformMessageExtractor implements MessageExtractor {
     }
 
     messageBlocks.forEach((block, index) => {
-      const fullText = block.textContent || '';
+      // 豆包新版：关键判断依据是 markdown
+      // markdown=true → 助手消息，markdown=false → 用户消息
+      const hasMarkdown = !!block.querySelector('[class*="markdown"], [class*="flow-markdown"]');
 
-      // 多重检测用户消息的方式
-      // 1. 检查 bg-s-color-bg-trans 类（豆包用户消息标志）
-      const hasUserClass = !!block.querySelector('[class*="bg-s-color-bg-trans"]');
+      // 助手消息特征：有 markdown 内容
+      const isAssistantMessage = hasMarkdown;
 
-      // 2. 检查是否有助手特有的元素（头像、thinking等）
-      const hasAssistantAvatar = !!block.querySelector('[class*="avatar"], [class*="bot-avatar"], [class*="ai-avatar"], img');
-      const hasThinkingSection = !!block.querySelector('[class*="thinking"], [class*="thought"], [class*="reasoning"]');
-
-      // 3. 根据内容特征判断
-      const hasAssistantMarkers = fullText.includes('已完成思考') ||
-                                   fullText.includes('思考过程') ||
-                                   fullText.includes('让我来') ||
-                                   fullText.includes('我来帮你') ||
-                                   fullText.includes('我来分析') ||
-                                   fullText.includes('好的') ||
-                                   fullText.includes('以下是') ||
-                                   fullText.length > 200; // 助手回复通常较长
-
-      // 综合判断：如果有助手特征，则不是用户消息
-      const isUserMessage = hasUserClass && !hasAssistantAvatar && !hasThinkingSection && !hasAssistantMarkers;
-
-      if (isUserMessage) {
-        // User message - extract normally
-        const contentElement = block.querySelector('[class*="container-"]') ||
+      if (!isAssistantMessage) {
+        // User message
+        const contentElement = block.querySelector('[class*="content-"]') ||
+                               block.querySelector('[class*="container-"]') ||
                                block.querySelector('[class*="message-content"]') ||
-                               block.querySelector('[class*="content"]') ||
                                block;
         const content = this.extractTextContent(contentElement);
         if (content && content.length > 0) {
@@ -513,9 +500,10 @@ class PlatformMessageExtractor implements MessageExtractor {
         }
       } else {
         // Assistant message
-        const contentElement = block.querySelector('[class*="container-"]') ||
-                               block.querySelector('[class*="message-content"]') ||
-                               block.querySelector('[class*="content"]') ||
+        const contentElement = block.querySelector('[class*="flow-markdown"]') ||
+                               block.querySelector('[class*="markdown"]') ||
+                               block.querySelector('[class*="content-"]') ||
+                               block.querySelector('[class*="container-"]') ||
                                block;
         const content = this.extractDoubaoAssistantContent(contentElement);
         if (content && content.length > 0) {
@@ -529,6 +517,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       }
     });
 
+    console.log(`[OmniContext] Doubao: extracted ${messages.length} messages`);
     return messages;
   }
 
