@@ -55,7 +55,7 @@ class Storage:
         if db_path is None:
             # 默认存储在用户目录
             home = os.path.expanduser("~")
-            data_dir = os.path.join(home, ".omnicontext")
+            data_dir = os.path.join(home, ".contextdrop")
             os.makedirs(data_dir, exist_ok=True)
             db_path = os.path.join(data_dir, "data.db")
 

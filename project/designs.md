@@ -129,7 +129,7 @@ Popup → chrome.tabs.sendMessage → Content Script
 - 点击「导出」按钮
 - 收集所有数据（会话 + 标签 + 关联）
 - 生成 JSON 文件并下载
-- 文件名：`omnicontext-backup-YYYY-MM-DD.json`
+- 文件名：`contextdrop-backup-YYYY-MM-DD.json`
 - Toast 提示：「备份文件已下载」
 
 ### 导入功能
@@ -147,7 +147,7 @@ Popup → chrome.tabs.sendMessage → Content Script
 ┌─────────────────────────────────┐
 │  📥 导入确认                    │
 ├─────────────────────────────────┤
-│  文件：omnicontext-backup.json  │
+│  文件：contextdrop-backup.json  │
 │  会话数：25                     │
 │  标签数：5                      │
 ├─────────────────────────────────┤

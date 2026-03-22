@@ -30,23 +30,23 @@ python install.py --extension-id=你的扩展ID
 ### Linux
 
 安装脚本会自动将 manifest 文件复制到：
-- `~/.config/google-chrome/NativeMessagingHosts/com.omnicontext.host.json`
-- `~/.config/chromium/NativeMessagingHosts/com.omnicontext.host.json`
+- `~/.config/google-chrome/NativeMessagingHosts/com.contextdrop.host.json`
+- `~/.config/chromium/NativeMessagingHosts/com.contextdrop.host.json`
 
 ### macOS
 
 manifest 文件会被复制到：
-- `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.omnicontext.host.json`
+- `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.contextdrop.host.json`
 
 ### Windows
 
 需要手动添加注册表项：
 
-1. 运行安装脚本会生成 `com.omnicontext.host.json` 文件
+1. 运行安装脚本会生成 `com.contextdrop.host.json` 文件
 2. 打开注册表编辑器 (`regedit`)
 3. 创建或导航到：
    ```
-   HKCU\Software\Google\Chrome\NativeMessagingHosts\com.omnicontext.host
+   HKCU\Software\Google\Chrome\NativeMessagingHosts\com.contextdrop.host
    ```
 4. 将默认值设置为生成的 manifest 文件完整路径
 

@@ -98,7 +98,7 @@ conn.execute("PRAGMA temp_store=MEMORY")
 ### 文件结构
 ```
 sdk/python/
-├── omnicontext/
+├── contextdrop/
 │   ├── __init__.py
 │   ├── client.py
 │   └── models.py
@@ -126,7 +126,7 @@ sdk/python/
 - [x] Native Messaging 配置
   - native/native_host.py - Native Host 脚本
   - native/install.py - 安装脚本
-  - native/omnicontext_host.json - Manifest 模板
+  - native/contextdrop_host.json - Manifest 模板
 - [x] Chrome 扩展更新
   - manifest.json 添加 nativeMessaging 权限
   - background/index.ts 添加 Native Messaging 通信
@@ -209,7 +209,7 @@ interface Session {
 - [ ] Popup 可选读取本地服务数据
 
 #### Phase 2.3: Python SDK
-- [ ] 实现 SDK 核心功能 (`omnicontext` 包)
+- [ ] 实现 SDK 核心功能 (`contextdrop` 包)
 - [ ] 编写文档和示例
 - [ ] 发布到 PyPI
 
@@ -221,9 +221,9 @@ interface Session {
 ### API 设计预览
 
 ```python
-import omnicontext
+import contextdrop
 
-client = omnicontext.Client()
+client = contextdrop.Client()
 
 # 读取
 sessions = client.get_sessions(source="platform", platform="kimi")

@@ -16,7 +16,7 @@ interface BatchCaptureState {
 }
 
 // Native Host 配置
-const NATIVE_HOST_NAME = 'com.omnicontext.host';
+const NATIVE_HOST_NAME = 'com.contextdrop.host';
 let nativeHostConnected = false;
 
 let batchCaptureState: BatchCaptureState = {

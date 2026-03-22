@@ -9,18 +9,18 @@
     "file": "assets/extractor-C9pnGJkB.js",
     "name": "extractor"
   },
-  "_index.ts-loader-Yc3v0-Fg.js": {
-    "file": "assets/index.ts-loader-Yc3v0-Fg.js",
-    "src": "_index.ts-loader-Yc3v0-Fg.js"
+  "_index.ts-loader-pcr5R2Ap.js": {
+    "file": "assets/index.ts-loader-pcr5R2Ap.js",
+    "src": "_index.ts-loader-pcr5R2Ap.js"
   },
   "src/background/index.ts": {
-    "file": "assets/index.ts-D73yrmsF.js",
+    "file": "assets/index.ts-B6CBX-n7.js",
     "name": "index.ts",
     "src": "src/background/index.ts",
     "isEntry": true
   },
   "src/content/index.ts": {
-    "file": "assets/index.ts-BIgQzje0.js",
+    "file": "assets/index.ts-CbACCwse.js",
     "name": "index.ts",
     "src": "src/content/index.ts",
     "isEntry": true,
@@ -29,7 +29,7 @@
     ]
   },
   "src/popup/index.html": {
-    "file": "assets/popup-BClo5ZJA.js",
+    "file": "assets/popup-CyfgQCvx.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,

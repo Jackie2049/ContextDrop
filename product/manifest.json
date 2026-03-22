@@ -49,7 +49,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/index.ts-loader-Yc3v0-Fg.js"
+        "assets/index.ts-loader-pcr5R2Ap.js"
       ],
       "matches": [
         "https://www.doubao.com/*",
@@ -98,7 +98,7 @@
       ],
       "resources": [
         "assets/extractor-C9pnGJkB.js",
-        "assets/index.ts-BIgQzje0.js"
+        "assets/index.ts-CbACCwse.js"
       ],
       "use_dynamic_url": false
     }
