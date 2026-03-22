@@ -1,5 +1,5 @@
 {
-  "name": "com.omnicontext.host",
+  "name": "com.contextdrop.host",
   "description": "ContextDrop Native Host - Local memory storage service connector",
   "path": "__HOST_PATH__",
   "type": "stdio",

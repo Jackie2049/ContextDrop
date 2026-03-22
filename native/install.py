@@ -9,15 +9,15 @@ Usage:
     python install.py [--extension-id=YOUR_EXTENSION_ID]
 
 On Linux, the manifest will be installed to:
-    ~/.config/google-chrome/NativeMessagingHosts/com.omnicontext.host.json
+    ~/.config/google-chrome/NativeMessagingHosts/com.contextdrop.host.json
     or
-    ~/.config/chromium/NativeMessagingHosts/com.omnicontext.host.json
+    ~/.config/chromium/NativeMessagingHosts/com.contextdrop.host.json
 
 On macOS:
-    ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.omnicontext.host.json
+    ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.contextdrop.host.json
 
 On Windows, you need to add a registry key:
-    HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.omnicontext.host
+    HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.contextdrop.host
 """
 
 import os
@@ -39,12 +39,12 @@ def get_chrome_manifest_paths() -> list:
 
     if sys.platform == 'linux':
         return [
-            home / ".config/google-chrome/NativeMessagingHosts/com.omnicontext.host.json",
-            home / ".config/chromium/NativeMessagingHosts/com.omnicontext.host.json",
+            home / ".config/google-chrome/NativeMessagingHosts/com.contextdrop.host.json",
+            home / ".config/chromium/NativeMessagingHosts/com.contextdrop.host.json",
         ]
     elif sys.platform == 'darwin':
         return [
-            home / "Library/Application Support/Google/Chrome/NativeMessagingHosts/com.omnicontext.host.json",
+            home / "Library/Application Support/Google/Chrome/NativeMessagingHosts/com.contextdrop.host.json",
         ]
     elif sys.platform == 'win32':
         # Windows requires registry, return None to indicate special handling
@@ -58,7 +58,7 @@ def create_manifest(extension_id: str) -> dict:
     native_host_path = get_native_host_path()
 
     manifest = {
-        "name": "com.omnicontext.host",
+        "name": "com.contextdrop.host",
         "description": "ContextDrop Native Host - Local memory storage service connector",
         "path": str(native_host_path),
         "type": "stdio",
@@ -106,7 +106,7 @@ def print_windows_instructions(extension_id: str):
     native_host_path = get_native_host_path()
 
     # Create a temporary manifest file for the user to use
-    temp_manifest_path = Path(__file__).parent / "com.omnicontext.host.json"
+    temp_manifest_path = Path(__file__).parent / "com.contextdrop.host.json"
 
     with open(temp_manifest_path, 'w') as f:
         json.dump(manifest, f, indent=2)
@@ -118,7 +118,7 @@ def print_windows_instructions(extension_id: str):
     print(f"   {temp_manifest_path}")
     print("\n2. Open Registry Editor (regedit)")
     print("\n3. Navigate to or create the key:")
-    print("   HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.omnicontext.host")
+    print("   HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.contextdrop.host")
     print("\n4. Set the default value of this key to the manifest file path:")
     print(f"   {temp_manifest_path}")
     print("\n5. Restart Chrome")

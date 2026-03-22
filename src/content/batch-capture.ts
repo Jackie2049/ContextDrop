@@ -413,7 +413,7 @@ export class BatchCapture {
     if (this.floatingProgress) return;
 
     const container = document.createElement('div');
-    container.id = 'omnicontext-batch-progress';
+    container.id = 'contextdrop-batch-progress';
     container.innerHTML = `
       <div class="oc-progress-header">
         <span>📦 ContextDrop 批量捕获</span>
@@ -443,7 +443,7 @@ export class BatchCapture {
     // 添加样式
     const style = document.createElement('style');
     style.textContent = `
-      #omnicontext-batch-progress {
+      #contextdrop-batch-progress {
         position: fixed;
         bottom: 20px;
         right: 20px;
@@ -456,14 +456,14 @@ export class BatchCapture {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px;
       }
-      #omnicontext-batch-progress .oc-progress-header {
+      #contextdrop-batch-progress .oc-progress-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 12px;
         font-weight: 600;
       }
-      #omnicontext-batch-progress .oc-progress-close {
+      #contextdrop-batch-progress .oc-progress-close {
         background: none;
         border: none;
         font-size: 18px;
@@ -471,7 +471,7 @@ export class BatchCapture {
         color: #999;
       }
       /* 扫描状态样式 */
-      #omnicontext-batch-progress .oc-scan-status {
+      #contextdrop-batch-progress .oc-scan-status {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -480,68 +480,68 @@ export class BatchCapture {
         border-radius: 8px;
         margin-bottom: 12px;
       }
-      #omnicontext-batch-progress .oc-scan-dots {
+      #contextdrop-batch-progress .oc-scan-dots {
         display: inline-flex;
         gap: 2px;
       }
-      #omnicontext-batch-progress .oc-scan-dots span {
+      #contextdrop-batch-progress .oc-scan-dots span {
         animation: oc-bounce 1.4s infinite ease-in-out both;
         color: #667eea;
         font-weight: bold;
       }
-      #omnicontext-batch-progress .oc-scan-dots span:nth-child(1) { animation-delay: -0.32s; }
-      #omnicontext-batch-progress .oc-scan-dots span:nth-child(2) { animation-delay: -0.16s; }
-      #omnicontext-batch-progress .oc-scan-dots span:nth-child(3) { animation-delay: 0s; }
+      #contextdrop-batch-progress .oc-scan-dots span:nth-child(1) { animation-delay: -0.32s; }
+      #contextdrop-batch-progress .oc-scan-dots span:nth-child(2) { animation-delay: -0.16s; }
+      #contextdrop-batch-progress .oc-scan-dots span:nth-child(3) { animation-delay: 0s; }
       @keyframes oc-bounce {
         0%, 80%, 100% { opacity: 0.3; }
         40% { opacity: 1; }
       }
-      #omnicontext-batch-progress .oc-scan-text {
+      #contextdrop-batch-progress .oc-scan-text {
         color: #555;
         font-weight: 500;
       }
-      #omnicontext-batch-progress .oc-scan-count {
+      #contextdrop-batch-progress .oc-scan-count {
         margin-left: auto;
         color: #667eea;
         font-size: 12px;
       }
-      #omnicontext-batch-progress .oc-scan-count strong {
+      #contextdrop-batch-progress .oc-scan-count strong {
         font-size: 16px;
         font-weight: 600;
       }
       /* 捕获状态样式 */
-      #omnicontext-batch-progress .oc-progress-bar {
+      #contextdrop-batch-progress .oc-progress-bar {
         height: 6px;
         background: #e8e8e8;
         border-radius: 3px;
         overflow: hidden;
         margin-bottom: 10px;
       }
-      #omnicontext-batch-progress .oc-progress-fill {
+      #contextdrop-batch-progress .oc-progress-fill {
         height: 100%;
         background: linear-gradient(90deg, #667eea, #764ba2);
         border-radius: 3px;
         transition: width 0.3s;
         width: 0%;
       }
-      #omnicontext-batch-progress .oc-progress-info {
+      #contextdrop-batch-progress .oc-progress-info {
         display: flex;
         justify-content: space-between;
         margin-bottom: 6px;
       }
-      #omnicontext-batch-progress .oc-progress-title {
+      #contextdrop-batch-progress .oc-progress-title {
         color: #666;
         max-width: 180px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      #omnicontext-batch-progress .oc-progress-captured {
+      #contextdrop-batch-progress .oc-progress-captured {
         color: #888;
         font-size: 12px;
         margin-bottom: 10px;
       }
-      #omnicontext-batch-progress .oc-progress-cancel {
+      #contextdrop-batch-progress .oc-progress-cancel {
         width: 100%;
         padding: 8px;
         background: #f5f5f5;
@@ -550,7 +550,7 @@ export class BatchCapture {
         cursor: pointer;
         font-size: 12px;
       }
-      #omnicontext-batch-progress .oc-progress-cancel:hover {
+      #contextdrop-batch-progress .oc-progress-cancel:hover {
         background: #ff4d4f;
         color: white;
       }
