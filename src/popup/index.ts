@@ -63,17 +63,6 @@ const PLATFORM_ICON_URLS: Record<Platform, string> = {
 // 平台排序顺序
 const PLATFORM_ORDER: Platform[] = ['doubao', 'chatgpt', 'gemini', 'deepseek', 'claude', 'yuanbao', 'kimi'];
 
-// 平台主题色（状态点颜色）
-const PLATFORM_THEME_COLORS: Record<Platform, string> = {
-  doubao: '#37B4FE',    // 天蓝色
-  yuanbao: '#00CC71',   // 青绿色
-  deepseek: '#4D6BFE',  // 藏青蓝
-  kimi: '#101010',      // 黑色
-  gemini: '#448AFF',    // 蓝色
-  chatgpt: '#10A37F',   // 翠绿色
-  claude: '#D97757',    // 橘黄色
-};
-
 // DOM Elements
 const sessionListEl = document.getElementById('session-list')!;
 const exportBtn = document.getElementById('export-btn')!;
@@ -351,21 +340,19 @@ function updateCurrentAssistantCard(platform: Platform | null, isConnected: bool
   // Update platform name
   assistantPlatformName.textContent = formatPlatformName(platform);
 
-  // 设置状态点颜色为平台主题色
-  const themeColor = PLATFORM_THEME_COLORS[platform] || '#8e8e93';
-  assistantStatusDot.style.backgroundColor = themeColor;
+  // 重置状态点内联样式，让CSS类控制颜色
+  assistantStatusDot.style.backgroundColor = '';
+  assistantStatusText.style.color = '';
 
   // Update status based on auto-capture state
   if (isConnected) {
     assistantStatusDot.classList.add('connected');
     assistantStatusText.classList.add('connected');
     assistantStatusText.textContent = '已连接';
-    assistantStatusText.style.color = themeColor;
   } else {
     assistantStatusDot.classList.remove('connected');
     assistantStatusText.classList.remove('connected');
     assistantStatusText.textContent = '已断开：请刷新AI平台，并打开自动捕获开关';
-    assistantStatusText.style.color = '';
   }
 
   // 如果连接状态发生变化，更新自动捕获按钮
