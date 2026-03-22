@@ -686,6 +686,9 @@ export class BatchCapture {
     if (this.platform === 'chatgpt') {
       return this.getChatgptSessionListElements();
     }
+    if (this.platform === 'claude') {
+      return this.getClaudeSessionListElements();
+    }
     // 其他平台待实现
     return [];
   }
@@ -709,6 +712,9 @@ export class BatchCapture {
     if (this.platform === 'chatgpt') {
       return this.getChatgptSessionTitle(element);
     }
+    if (this.platform === 'claude') {
+      return this.getClaudeSessionTitle(element);
+    }
     return '未知会话';
   }
 
@@ -730,6 +736,9 @@ export class BatchCapture {
     }
     if (this.platform === 'chatgpt') {
       return this.getChatgptSessionIdFromElement(element);
+    }
+    if (this.platform === 'claude') {
+      return this.getClaudeSessionIdFromElement(element);
     }
     return null;
   }
@@ -765,6 +774,21 @@ export class BatchCapture {
           count++;
         }
       });
+      return count;
+    }
+
+    if (this.platform === 'claude') {
+      // Claude: 查找 /chat/ 链接
+      const items = sidebar.querySelectorAll('a[href^="/chat/"]');
+      let count = 0;
+      items.forEach(item => {
+        const href = item.getAttribute('href') || '';
+        // 只计数有效的会话链接（UUID格式）
+        if (/^\/chat\/[0-9a-f-]{8,}/i.test(href)) {
+          count++;
+        }
+      });
+      console.log(`[OmniContext] Claude countSessionsInSidebar: ${count} sessions`);
       return count;
     }
 
@@ -919,6 +943,15 @@ export class BatchCapture {
           break;
         }
       }
+    } else if (this.platform === 'claude') {
+      // Claude: 会话是链接，点击后等待 URL 变化
+      const currentUrl = window.location.href;
+      console.log('[OmniContext] Claude: Clicking session with href:', element.getAttribute('href'));
+      (element as HTMLElement).click();
+      for (let i = 0; i < 20; i++) {
+        await this.sleep(200);
+        if (window.location.href !== currentUrl) break;
+      }
     } else {
       (element as HTMLElement).click();
     }
@@ -1062,6 +1095,20 @@ export class BatchCapture {
 
       // 额外等待确保内容完全渲染
       await this.sleep(1000);
+    } else if (this.platform === 'claude') {
+      // Claude: 等待消息元素加载
+      console.log('[OmniContext] Claude: Waiting for session to load...');
+      await this.sleep(800);
+      // 等待 user-message 或 font-claude-message 出现
+      let attempts = 0;
+      while (attempts < 10) {
+        const msgs = document.querySelectorAll('[data-testid="user-message"], .font-claude-message.leading-relaxed');
+        if (msgs.length > 0) break;
+        await this.sleep(500);
+        attempts++;
+      }
+      await this.sleep(500); // 额外等待渲染
+      console.log('[OmniContext] Claude: Session loaded');
     } else {
       await this.sleep(1500);
     }
@@ -1107,6 +1154,18 @@ export class BatchCapture {
       return this.countGeminiMessages();
     }
 
+    // Claude 专用统计
+    if (this.platform === 'claude') {
+      const userMsgs = document.querySelectorAll('[data-testid="user-message"]');
+      // 尝试多种助手消息选择器
+      let assistantMsgs: NodeListOf<Element> | null = null;
+      for (const sel of ['.font-claude-message', '[class*="font-claude-message"]', '[class*="leading-relaxed"]']) {
+        const found = document.querySelectorAll(sel);
+        if (found.length > 0) { assistantMsgs = found; break; }
+      }
+      return userMsgs.length + (assistantMsgs?.length || 0);
+    }
+
     const selectors = [
       '[class*="message-item"]',
       '[class*="chat-message"]',
@@ -1131,6 +1190,14 @@ export class BatchCapture {
       if (this.platform === 'chatgpt') {
         if (url.includes('/c/new') || url.endsWith('/chat') || url.endsWith('/chat/')) {
           console.log('[OmniContext] Skipping ChatGPT new chat page:', url);
+          return null;
+        }
+      }
+
+      // Claude: 跳过 "新聊天" 页面
+      if (this.platform === 'claude') {
+        if (url.includes('/chat/new') || url.endsWith('/chat') || url.endsWith('/chat/')) {
+          console.log('[OmniContext] Skipping Claude new chat page:', url);
           return null;
         }
       }
@@ -1245,6 +1312,16 @@ export class BatchCapture {
         '[class*="history"]',
         '[data-testid="history-sidebar"]',
         '[class*="conversation-list"]',
+      ];
+    } else if (this.platform === 'claude') {
+      // Claude: 侧边栏选择器（不依赖 data-testid）
+      sidebarSelectors = [
+        'nav',
+        'aside',
+        '[class*="sidebar"]',
+        '[class*="Sidebar"]',
+        '[aria-label*="history"]',
+        '[aria-label*="chat"]',
       ];
     } else {
       // 豆包及其他平台
@@ -1436,6 +1513,9 @@ export class BatchCapture {
     }
     if (this.platform === 'kimi') {
       return this.ensureKimiSidebarOpen();
+    }
+    if (this.platform === 'claude') {
+      return this.ensureClaudeSidebarOpen();
     }
   }
 
@@ -2813,6 +2893,127 @@ export class BatchCapture {
     }
 
     return null;
+  }
+
+  // ========== Claude 平台特定方法 ==========
+
+  private getClaudeSessionListElements(): Element[] {
+    console.log('[OmniContext] === Claude Session List Debug ===');
+
+    // Claude 的侧边栏没有 data-testid 属性，使用通用选择器
+    // 策略1: 直接查找所有 /chat/ 链接
+    let allLinks = document.querySelectorAll('a[href^="/chat/"]');
+    console.log(`[OmniContext] Claude: Found ${allLinks.length} total /chat/ links`);
+
+    // 策略2: 如果没找到，尝试在 nav 或 aside 中查找
+    if (allLinks.length === 0) {
+      const navOrAside = document.querySelector('nav, aside');
+      if (navOrAside) {
+        allLinks = navOrAside.querySelectorAll('a[href^="/chat/"]');
+        console.log(`[OmniContext] Claude: Found ${allLinks.length} links in nav/aside`);
+      }
+    }
+
+    // 策略3: 查找包含 sidebar 类名的容器
+    if (allLinks.length === 0) {
+      const sidebar = document.querySelector('[class*="sidebar"], [class*="Sidebar"]');
+      if (sidebar) {
+        allLinks = sidebar.querySelectorAll('a[href^="/chat/"]');
+        console.log(`[OmniContext] Claude: Found ${allLinks.length} links in sidebar container`);
+      }
+    }
+
+    // 过滤：只保留有效的会话链接（UUID格式）
+    const sessionLinks = Array.from(allLinks).filter(link => {
+      const href = link.getAttribute('href') || '';
+      // 排除 /chat/new 等非对话链接，只匹配 UUID 格式
+      const isValid = /^\/chat\/[0-9a-f-]{8,}/i.test(href);
+      return isValid;
+    });
+
+    console.log(`[OmniContext] Claude: Found ${sessionLinks.length} valid sessions (UUID format)`);
+
+    // 打印调试信息
+    sessionLinks.slice(0, 5).forEach((item, i) => {
+      console.log(`[OmniContext] Claude [${i}] href="${item.getAttribute('href')}" text="${item.textContent?.trim().slice(0, 50)}"`);
+    });
+
+    return sessionLinks;
+  }
+
+  private getClaudeSessionTitle(element: Element): string {
+    // Claude 链接内的标题可能在多个位置
+    // 尝试1: truncate 类
+    const titleEl = element.querySelector('.truncate');
+    if (titleEl?.textContent?.trim()) {
+      return titleEl.textContent.trim();
+    }
+    // 尝试2: 直接取链接文本
+    const text = element.textContent?.trim();
+    if (text && text.length < 200) {
+      return text;
+    }
+    return '未命名对话';
+  }
+
+  private getClaudeSessionIdFromElement(element: Element): string | null {
+    const href = element.getAttribute('href') || '';
+    const match = href.match(/\/chat\/([0-9a-f-]{8,})/i);
+    return match?.[1] || null;
+  }
+
+  private async ensureClaudeSidebarOpen(): Promise<void> {
+    console.log('[OmniContext] === Claude Sidebar Check ===');
+
+    // Claude 侧边栏选择器（不依赖 data-testid）
+    const sidebarSelectors = [
+      'nav',
+      'aside',
+      '[class*="sidebar"]',
+      '[class*="Sidebar"]',
+      '[aria-label*="history"]',
+      '[aria-label*="chat"]',
+    ];
+
+    let sidebar: Element | null = null;
+    for (const selector of sidebarSelectors) {
+      sidebar = document.querySelector(selector);
+      if (sidebar) {
+        const links = sidebar.querySelectorAll('a[href^="/chat/"]');
+        if (links.length > 0) {
+          console.log(`[OmniContext] Claude sidebar found via: ${selector} with ${links.length} chat links`);
+          break;
+        }
+      }
+    }
+
+    if (sidebar) {
+      // 检查侧边栏是否可见
+      const rect = sidebar.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        console.log('[OmniContext] Claude sidebar is visible');
+        await this.sleep(300);
+        return;
+      }
+    }
+
+    // 尝试点击打开侧边栏的按钮
+    const toggleSelectors = [
+      'button[aria-label*="sidebar"]',
+      'button[aria-label*="menu"]',
+      'button[class*="sidebar"]',
+      '[class*="sidebar-toggle"]',
+    ];
+
+    for (const selector of toggleSelectors) {
+      const toggleBtn = document.querySelector(selector);
+      if (toggleBtn) {
+        console.log(`[OmniContext] Clicking sidebar toggle: ${selector}`);
+        (toggleBtn as HTMLElement).click();
+        await this.sleep(800);
+        break;
+      }
+    }
   }
 
   private async chatgptScrollToLoadHistory(): Promise<number> {

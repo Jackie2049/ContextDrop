@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OmniContext",
-  "version": "1.0.1",
+  "version": "0.0.2",
   "description": "跨平台AI对话上下文管理工具 - 在不同AI助手间共享记忆",
   "commands": {
     "_execute_action": {
