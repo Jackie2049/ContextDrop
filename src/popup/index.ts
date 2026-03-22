@@ -256,15 +256,15 @@ async function saveAutoCaptureState(enabled: boolean): Promise<void> {
 
 // Update auto capture toggle UI
 function updateAutoCaptureToggleUI(): void {
-  // 如果连接断开，强制显示熄灭状态
-  if (!isConnectedToContentScript) {
+  // 只有当没有检测到平台时才禁用按钮
+  if (!currentPlatform) {
     autoCaptureBtn.classList.remove('active');
     autoCaptureBtn.classList.add('disabled');
     autoCaptureText.textContent = '自动捕获：关';
     return;
   }
 
-  // 连接正常时，显示正常状态
+  // 平台已检测到，按钮可用
   autoCaptureBtn.classList.remove('disabled');
 
   if (isAutoCaptureEnabled) {
@@ -278,9 +278,9 @@ function updateAutoCaptureToggleUI(): void {
 
 // Toggle auto capture state
 async function toggleAutoCapture(): Promise<void> {
-  // 如果连接断开，禁止切换
-  if (!isConnectedToContentScript) {
-    showToast('💡 请先刷新AI平台网页，再打开「自动捕获」开关');
+  // 只有当没有检测到平台时才拒绝操作
+  if (!currentPlatform) {
+    showToast('💡 请先打开支持的AI平台');
     return;
   }
 
