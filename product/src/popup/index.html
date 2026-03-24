@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ContextDrop</title>
-  <script type="module" crossorigin src="/assets/popup-CyfgQCvx.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/extractor-C9pnGJkB.js">
-  <link rel="stylesheet" crossorigin href="/assets/popup-KEbYZXlX.css">
+  <script type="module" crossorigin src="../../assets/popup-B4V1XMEr.js"></script>
+  <link rel="modulepreload" crossorigin href="../../assets/extractor-DeKQSyNM.js">
+  <link rel="stylesheet" crossorigin href="../../assets/popup-DEz9unrq.css">
 </head>
 <body>
   <div id="app">
@@ -82,25 +82,25 @@
           <div class="chip-dot" style="background:#888"></div>全部
         </div>
         <div class="platform-chip" data-platform="doubao">
-          <div class="chip-dot" style="background:#00D4AA"></div>豆包
-        </div>
-        <div class="platform-chip" data-platform="yuanbao">
-          <div class="chip-dot" style="background:#4A90E2"></div>元宝
-        </div>
-        <div class="platform-chip" data-platform="deepseek">
-          <div class="chip-dot" style="background:#6366F1"></div>DeepSeek
-        </div>
-        <div class="platform-chip" data-platform="kimi">
-          <div class="chip-dot" style="background:#FF6B35"></div>Kimi
-        </div>
-        <div class="platform-chip" data-platform="gemini">
-          <div class="chip-dot" style="background:#4285F4"></div>Gemini
+          <div class="chip-dot" style="background:#37B4FE"></div>豆包
         </div>
         <div class="platform-chip" data-platform="chatgpt">
           <div class="chip-dot" style="background:#10A37F"></div>ChatGPT
         </div>
         <div class="platform-chip" data-platform="claude">
-          <div class="chip-dot" style="background:#D4A373"></div>Claude
+          <div class="chip-dot" style="background:#D97757"></div>Claude
+        </div>
+        <div class="platform-chip" data-platform="gemini">
+          <div class="chip-dot" style="background:#448AFF"></div>Gemini
+        </div>
+        <div class="platform-chip" data-platform="deepseek">
+          <div class="chip-dot" style="background:#4D6BFE"></div>DeepSeek
+        </div>
+        <div class="platform-chip" data-platform="yuanbao">
+          <div class="chip-dot" style="background:#00CC71"></div>元宝
+        </div>
+        <div class="platform-chip" data-platform="kimi">
+          <div class="chip-dot" style="background:#101010"></div>Kimi
         </div>
       </div>
     </div>
@@ -127,9 +127,14 @@
     </div>
 
     <footer class="footer">
+      <div class="settings-wrapper">
+        <button id="settings-btn" class="btn btn-secondary">⚙️ 设置</button>
+        <div id="settings-menu" class="settings-menu">
+          <button id="menu-export" class="settings-menu-item">📤 记忆导出到文件</button>
+          <button id="menu-import" class="settings-menu-item">📥 从文件导入记忆</button>
+        </div>
+      </div>
       <button id="manage-btn" class="btn btn-secondary">🗑️ 管理</button>
-      <button id="export-btn" class="btn btn-secondary">📤 导出</button>
-      <button id="import-btn" class="btn btn-secondary">📥 导入</button>
       <button id="refresh-btn" class="btn btn-primary">🔄 刷新</button>
     </footer>
 
@@ -255,22 +260,22 @@
           <div class="onboarding-step">
             <span class="step-number">1</span>
             <div class="step-content">
-              <div class="step-title">打开AI平台</div>
-              <div class="step-desc">访问豆包、ChatGPT等</div>
+              <div class="step-title">打开AI助手平台</div>
+              <div class="step-desc">网页访问豆包、ChatGPT等AI助手平台</div>
             </div>
           </div>
           <div class="onboarding-step">
             <span class="step-number">2</span>
             <div class="step-content">
-              <div class="step-title">开启自动捕获</div>
-              <div class="step-desc">点击「自动捕获」按钮，持续捕获AI记忆</div>
+              <div class="step-title">捕获会话</div>
+              <div class="step-desc">通过「自动捕获」或「批量捕获」功能捕捉您和AI助手的对话记忆</div>
             </div>
           </div>
           <div class="onboarding-step">
             <span class="step-number">3</span>
             <div class="step-content">
-              <div class="step-title">批量捕获会话</div>
-              <div class="step-desc">点击「批量捕获」按钮，扫描全部历史对话，无缝迁移AI记忆</div>
+              <div class="step-title">注入记忆</div>
+              <div class="step-desc">浏览已保存会话，将记忆一键注入AI助手</div>
             </div>
           </div>
         </div>

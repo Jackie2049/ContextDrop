@@ -65,8 +65,10 @@ const PLATFORM_ORDER: Platform[] = ['doubao', 'chatgpt', 'claude', 'gemini', 'de
 
 // DOM Elements
 const sessionListEl = document.getElementById('session-list')!;
-const exportBtn = document.getElementById('export-btn')!;
-const importBtn = document.getElementById('import-btn')!;
+const settingsBtn = document.getElementById('settings-btn')!;
+const settingsMenu = document.getElementById('settings-menu')!;
+const menuExport = document.getElementById('menu-export')!;
+const menuImport = document.getElementById('menu-import')!;
 const refreshBtn = document.getElementById('refresh-btn')!;
 const manageBtn = document.getElementById('manage-btn')!;
 const toastEl = document.getElementById('toast')!;
@@ -438,8 +440,30 @@ async function init() {
   await loadSessions();
 
   // Bind events
-  exportBtn.addEventListener('click', handleExport);
-  importBtn.addEventListener('click', () => importFileInput.click());
+  // Settings menu toggle
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.classList.toggle('show');
+  });
+
+  // Close settings menu when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!settingsBtn.contains(e.target as Node) && !settingsMenu.contains(e.target as Node)) {
+      settingsMenu.classList.remove('show');
+    }
+  });
+
+  // Menu item events
+  menuExport.addEventListener('click', () => {
+    settingsMenu.classList.remove('show');
+    handleExport();
+  });
+
+  menuImport.addEventListener('click', () => {
+    settingsMenu.classList.remove('show');
+    importFileInput.click();
+  });
+
   refreshBtn.addEventListener('click', loadSessions);
 
   // Import events

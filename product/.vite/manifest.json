@@ -1,17 +1,17 @@
 {
   "../../../../../../../@crx/manifest": {
-    "file": "assets/crx-manifest.js-CT9000C7.js",
+    "file": "assets/crx-manifest.js-BgNH34QJ.js",
     "name": "crx-manifest.js",
     "src": "../../../../../../../@crx/manifest",
     "isEntry": true
   },
-  "_extractor-C9pnGJkB.js": {
-    "file": "assets/extractor-C9pnGJkB.js",
+  "_extractor-DeKQSyNM.js": {
+    "file": "assets/extractor-DeKQSyNM.js",
     "name": "extractor"
   },
-  "_index.ts-loader-pcr5R2Ap.js": {
-    "file": "assets/index.ts-loader-pcr5R2Ap.js",
-    "src": "_index.ts-loader-pcr5R2Ap.js"
+  "_index.ts-loader-cRzsEGJF.js": {
+    "file": "assets/index.ts-loader-cRzsEGJF.js",
+    "src": "_index.ts-loader-cRzsEGJF.js"
   },
   "src/background/index.ts": {
     "file": "assets/index.ts-B6CBX-n7.js",
@@ -20,24 +20,24 @@
     "isEntry": true
   },
   "src/content/index.ts": {
-    "file": "assets/index.ts-CbACCwse.js",
+    "file": "assets/index.ts-CW5F7hxm.js",
     "name": "index.ts",
     "src": "src/content/index.ts",
     "isEntry": true,
     "imports": [
-      "_extractor-C9pnGJkB.js"
+      "_extractor-DeKQSyNM.js"
     ]
   },
   "src/popup/index.html": {
-    "file": "assets/popup-CyfgQCvx.js",
+    "file": "assets/popup-B4V1XMEr.js",
     "name": "popup",
     "src": "src/popup/index.html",
     "isEntry": true,
     "imports": [
-      "_extractor-C9pnGJkB.js"
+      "_extractor-DeKQSyNM.js"
     ],
     "css": [
-      "assets/popup-KEbYZXlX.css"
+      "assets/popup-DEz9unrq.css"
     ]
   }
 }

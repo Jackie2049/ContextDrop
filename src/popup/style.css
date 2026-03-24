@@ -215,12 +215,12 @@ body {
 }
 
 .btn-assistant-secondary {
-  background: var(--canvas-bg);
+  background: #d8d8d8;
   color: var(--text-primary);
 }
 
 .btn-assistant-secondary:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: #d8d8d8;
 }
 
 .btn-assistant-secondary.active {
@@ -235,12 +235,12 @@ body {
 .btn-assistant-secondary.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: var(--canvas-bg);
+  background: #d8d8d8;
   color: var(--text-secondary);
 }
 
 .btn-assistant-secondary.disabled:hover {
-  background: var(--canvas-bg);
+  background: #d8d8d8;
 }
 
 .btn-assistant-primary svg,
@@ -570,8 +570,14 @@ body {
   background: transparent;
 }
 
+.footer > *,
+.footer > .settings-wrapper {
+  flex: 1 1 calc((100% - 16px) / 3);
+  min-width: 0;
+}
+
 .btn {
-  flex: 1;
+  width: 100%;
   padding: 10px 16px;
   border: none;
   border-radius: var(--radius-pill);
@@ -1308,4 +1314,68 @@ body.dialog-open .main {
   width: 14px;
   height: 14px;
   accent-color: var(--accent-copper);
+}
+
+/* Settings Menu */
+.settings-wrapper {
+  position: relative;
+}
+
+.settings-wrapper .btn {
+  width: 100%;
+}
+
+.settings-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  white-space: nowrap;
+  background: var(--surface-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-float);
+  margin-bottom: 8px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.2s ease;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.settings-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.settings-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.settings-menu-item:first-child {
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+.settings-menu-item:last-child {
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.settings-menu-item:only-child {
+  border-radius: var(--radius-card);
+}
+
+.settings-menu-item:hover {
+  background: var(--canvas-bg);
 }

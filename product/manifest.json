@@ -49,7 +49,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/index.ts-loader-pcr5R2Ap.js"
+        "assets/index.ts-loader-cRzsEGJF.js"
       ],
       "matches": [
         "https://www.doubao.com/*",
@@ -97,8 +97,8 @@
         "https://yuanbao.tencent.com/*"
       ],
       "resources": [
-        "assets/extractor-C9pnGJkB.js",
-        "assets/index.ts-CbACCwse.js"
+        "assets/extractor-DeKQSyNM.js",
+        "assets/index.ts-CW5F7hxm.js"
       ],
       "use_dynamic_url": false
     }
