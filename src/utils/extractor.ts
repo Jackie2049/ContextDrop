@@ -1,5 +1,11 @@
 import type { Platform, Message } from '../types';
 
+const DEBUG = false;  // Set to true for debugging
+
+function log(...args: any[]) {
+  if (DEBUG) console.log('[ContextDrop]', ...args);
+}
+
 interface PlatformConfig {
   hostname: string;
   titleSelectors: string[];
@@ -282,7 +288,7 @@ export function extractSessionIdFromDOM(platform: Platform): string | null {
     if (activeItem) {
       const id = activeItem.getAttribute('data-item-id');
       if (id) {
-        console.log('[ContextDrop] Found Yuanbao session ID from active sidebar item:', id);
+        log('Found Yuanbao session ID from active sidebar item:', id);
         return id;
       }
     }
@@ -292,7 +298,7 @@ export function extractSessionIdFromDOM(platform: Platform): string | null {
     if (activeByCid) {
       const cid = activeByCid.getAttribute('dt-cid');
       if (cid) {
-        console.log('[ContextDrop] Found Yuanbao session ID from dt-cid:', cid);
+        log('Found Yuanbao session ID from dt-cid:', cid);
         return cid;
       }
     }
@@ -306,7 +312,7 @@ export function extractSessionIdFromDOM(platform: Platform): string | null {
         const parts = convId.split('_');
         if (parts.length >= 1) {
           const sessionId = parts.slice(0, -1).join('_') || convId;
-          console.log('[ContextDrop] Found Yuanbao session ID from message data-conv-id:', sessionId);
+          log(' Found Yuanbao session ID from message data-conv-id:', sessionId);
           return sessionId;
         }
       }
@@ -321,7 +327,7 @@ export function extractSessionIdFromDOM(platform: Platform): string | null {
                    urlObj.searchParams.get('id') ||
                    urlObj.searchParams.get('cid');
     if (chatId) {
-      console.log('[ContextDrop] Found Yuanbao session ID from URL params:', chatId);
+      log(' Found Yuanbao session ID from URL params:', chatId);
       return chatId;
     }
 
@@ -1081,7 +1087,7 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     // 获取所有段落或文本块
     const textBlocks = main.querySelectorAll('p, div > span, [class*="content"], [class*="text"]');
-    console.log(`[ContextDrop] Ultimate fallback: found ${textBlocks.length} text blocks`);
+    log(` Ultimate fallback: found ${textBlocks.length} text blocks`);
 
     // 按位置排序，交替分配用户/助手角色
     textBlocks.forEach((block, index) => {
@@ -1110,18 +1116,18 @@ class PlatformMessageExtractor implements MessageExtractor {
           content: fullText.slice(0, 10000),
           timestamp: Date.now(),
         });
-        console.log(`[ContextDrop] Ultimate fallback: using full text (${fullText.length} chars)`);
+        log(` Ultimate fallback: using full text (${fullText.length} chars)`);
       }
     }
 
-    console.log(`[ContextDrop] Ultimate fallback extracted ${messages.length} messages`);
+    log(` Ultimate fallback extracted ${messages.length} messages`);
     return messages;
   }
 
   private extractDeepseekFromDocument(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Trying DeepSeek fallback extraction...');
+    log(' Trying DeepSeek fallback extraction...');
 
     // Fallback: look for common message patterns
     const containerSelectors = [
@@ -1135,7 +1141,7 @@ class PlatformMessageExtractor implements MessageExtractor {
     for (const selector of containerSelectors) {
       container = document.querySelector(selector);
       if (container) {
-        console.log(`[ContextDrop] Found container with: ${selector}`);
+        log(` Found container with: ${selector}`);
         break;
       }
     }
@@ -1177,7 +1183,7 @@ class PlatformMessageExtractor implements MessageExtractor {
     messageCandidates.sort((a, b) => b.score - a.score);
     const topCandidates = messageCandidates.slice(0, 50);
 
-    console.log(`[ContextDrop] Found ${topCandidates.length} message candidates`);
+    log(` Found ${topCandidates.length} message candidates`);
 
     // Try to determine role based on position and content
     topCandidates.forEach(({ el }, index) => {
@@ -1264,7 +1270,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractKimiMessages(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Extracting Kimi messages...');
+    log(' Extracting Kimi messages...');
 
     // Kimi 使用语义化类名，结构清晰
     // 用户消息: .chat-content-item-user 或 .segment-user
@@ -1275,7 +1281,7 @@ class PlatformMessageExtractor implements MessageExtractor {
     const userMessages = document.querySelectorAll('.chat-content-item-user');
     const assistantMessages = document.querySelectorAll('.chat-content-item-assistant');
 
-    console.log(`[ContextDrop] Kimi: Found ${userMessages.length} user messages, ${assistantMessages.length} assistant messages`);
+    log(` Kimi: Found ${userMessages.length} user messages, ${assistantMessages.length} assistant messages`);
 
     // 合并并按 DOM 顺序排序
     const allElements: Array<{ el: Element; isUser: boolean }> = [
@@ -1298,11 +1304,11 @@ class PlatformMessageExtractor implements MessageExtractor {
           content,
           timestamp: Date.now(),
         });
-        console.log(`[ContextDrop] Kimi [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
+        log(` Kimi [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
       }
     });
 
-    console.log(`[ContextDrop] Kimi: Extracted ${messages.length} messages`);
+    log(` Kimi: Extracted ${messages.length} messages`);
 
     // 如果没找到消息，尝试备用方案
     if (messages.length === 0) {
@@ -1326,7 +1332,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractKimiFromDocument(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Kimi: Trying fallback extraction...');
+    log(' Kimi: Trying fallback extraction...');
 
     // 查找消息列表容器
     const container = document.querySelector('.chat-content-list, .message-list, [class*="chat-content"]');
@@ -1337,7 +1343,7 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     // 查找所有 segment 元素
     const segments = container.querySelectorAll('.segment-user, .segment-assistant, [class*="segment"]');
-    console.log(`[ContextDrop] Kimi fallback: Found ${segments.length} segments`);
+    log(` Kimi fallback: Found ${segments.length} segments`);
 
     segments.forEach((segment, index) => {
       const className = segment.className || '';
@@ -1354,7 +1360,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       }
     });
 
-    console.log(`[ContextDrop] Kimi fallback: Extracted ${messages.length} messages`);
+    log(` Kimi fallback: Extracted ${messages.length} messages`);
     return messages;
   }
 
@@ -1363,7 +1369,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractGeminiMessages(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Extracting Gemini messages...');
+    log(' Extracting Gemini messages...');
 
     // Gemini uses Material Design, user messages and AI responses are clearly distinguished
     // User: user-query-container or elements containing user-query
@@ -1407,7 +1413,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       });
     }
 
-    console.log(`[ContextDrop] Gemini: Found ${allElements.filter(e => e.isUser).length} user elements, ${allElements.filter(e => !e.isUser).length} assistant elements`);
+    log(` Gemini: Found ${allElements.filter(e => e.isUser).length} user elements, ${allElements.filter(e => !e.isUser).length} assistant elements`);
 
     if (allElements.length === 0) {
       return this.extractGeminiFromDocument();
@@ -1428,7 +1434,7 @@ class PlatformMessageExtractor implements MessageExtractor {
           content,
           timestamp: Date.now(),
         });
-        console.log(`[ContextDrop] Gemini [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
+        log(` Gemini [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
       }
     });
 
@@ -1442,7 +1448,7 @@ class PlatformMessageExtractor implements MessageExtractor {
         dedupedMessages.push(msg);
       }
     }
-    console.log(`[ContextDrop] Gemini: After dedup: ${dedupedMessages.length} messages (removed ${messages.length - dedupedMessages.length} duplicates)`);
+    log(` Gemini: After dedup: ${dedupedMessages.length} messages (removed ${messages.length - dedupedMessages.length} duplicates)`);
 
     if (dedupedMessages.length === 0) {
       return this.extractGeminiFromDocument();
@@ -1474,7 +1480,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractGeminiFromDocument(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Gemini: Trying fallback extraction...');
+    log(' Gemini: Trying fallback extraction...');
 
     // Find main conversation area
     const mainContainer = document.querySelector('main, [class*="conversation"], [class*="chat-container"], [data-test-id="conversation-panel"]');
@@ -1485,7 +1491,7 @@ class PlatformMessageExtractor implements MessageExtractor {
 
     // Try to infer messages from DOM structure
     const messageBlocks = mainContainer.querySelectorAll('[class*="container"], [class*="message"], [class*="query"], [class*="response"]');
-    console.log(`[ContextDrop] Gemini fallback: Found ${messageBlocks.length} potential message blocks`);
+    log(` Gemini fallback: Found ${messageBlocks.length} potential message blocks`);
 
     // Analyze each block's text length and structure
     const candidates: Array<{ el: Element; isUser: boolean; text: string }> = [];
@@ -1520,7 +1526,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       });
     });
 
-    console.log(`[ContextDrop] Gemini fallback: Extracted ${messages.length} messages`);
+    log(` Gemini fallback: Extracted ${messages.length} messages`);
     return messages;
   }
 
@@ -1542,7 +1548,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractChatgptMessages(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] Extracting ChatGPT messages...');
+    log(' Extracting ChatGPT messages...');
 
     // ChatGPT uses data-testid="conversation-turn-{index}" for each turn
     // Even turns (0, 2, 4...) are user messages, odd turns are assistant messages
@@ -1552,7 +1558,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       ? this.filterOutSidebarElements(Array.from(mainContent.querySelectorAll('[data-testid^="conversation-turn-"]')))
       : this.filterOutSidebarElements(Array.from(document.querySelectorAll('[data-testid^="conversation-turn-"]')));
 
-    console.log(`[ContextDrop] ChatGPT: Found ${turnElements.length} conversation turns`);
+    log(` ChatGPT: Found ${turnElements.length} conversation turns`);
 
     if (turnElements.length === 0) {
       // Fallback: try legacy class-based selectors
@@ -1573,11 +1579,11 @@ class PlatformMessageExtractor implements MessageExtractor {
           content,
           timestamp: Date.now(),
         });
-        console.log(`[ContextDrop] ChatGPT [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
+        log(` ChatGPT [${index}] ${isUser ? 'USER' : 'ASSISTANT'}: "${content.slice(0, 50)}..."`);
       }
     });
 
-    console.log(`[ContextDrop] ChatGPT: Extracted ${messages.length} messages`);
+    log(` ChatGPT: Extracted ${messages.length} messages`);
 
     // If no messages found, try fallback
     if (messages.length === 0) {
@@ -1674,7 +1680,7 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractChatgptFromLegacySelectors(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] ChatGPT: Trying legacy selector extraction...');
+    log(' ChatGPT: Trying legacy selector extraction...');
 
     // Legacy: ThreadLayout__NodeWrapper and ConversationItem__ConversationItemWrapper-sc
     const container = document.querySelector('[class*="ThreadLayout__NodeWrapper"]');
@@ -1685,7 +1691,7 @@ class PlatformMessageExtractor implements MessageExtractor {
     }
 
     const messageItems = container.querySelectorAll('[class*="ConversationItem__ConversationItemWrapper-sc"]');
-    console.log(`[ContextDrop] ChatGPT legacy: Found ${messageItems.length} message items`);
+    log(` ChatGPT legacy: Found ${messageItems.length} message items`);
 
     messageItems.forEach((item, index) => {
       // Try to determine role by structure or position
@@ -1718,13 +1724,13 @@ class PlatformMessageExtractor implements MessageExtractor {
   private extractChatgptFromDocument(): Message[] {
     const messages: Message[] = [];
 
-    console.log('[ContextDrop] ChatGPT: Trying fallback document extraction...');
+    log(' ChatGPT: Trying fallback document extraction...');
 
     // Strategy 1: Look for elements with data-message-author-role
     const userByRole = document.querySelectorAll('[data-message-author-role="user"]');
     const assistantByRole = document.querySelectorAll('[data-message-author-role="assistant"]');
 
-    console.log(`[ContextDrop] ChatGPT fallback: Found ${userByRole.length} user, ${assistantByRole.length} assistant by role`);
+    log(` ChatGPT fallback: Found ${userByRole.length} user, ${assistantByRole.length} assistant by role`);
 
     if (userByRole.length > 0 || assistantByRole.length > 0) {
       // Combine and sort by DOM position
@@ -1756,7 +1762,7 @@ class PlatformMessageExtractor implements MessageExtractor {
         }
       });
 
-      console.log(`[ContextDrop] ChatGPT role-based: Extracted ${messages.length} messages`);
+      log(` ChatGPT role-based: Extracted ${messages.length} messages`);
       return messages;
     }
 
@@ -1767,7 +1773,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       ? mainContent.querySelectorAll('article, [data-testid^="conversation-turn-"], .group, [class*="conversation-item"]')
       : document.querySelectorAll('main article, [data-testid^="conversation-turn-"], .group, [class*="conversation-item"]');
 
-    console.log(`[ContextDrop] ChatGPT fallback: Found ${candidates.length} candidates`);
+    log(` ChatGPT fallback: Found ${candidates.length} candidates`);
 
     // Filter and sort by position
     const messageCandidates: Array<{ el: Element; text: string }> = [];
@@ -1797,7 +1803,7 @@ class PlatformMessageExtractor implements MessageExtractor {
       }
     });
 
-    console.log(`[ContextDrop] ChatGPT fallback: Extracted ${messages.length} messages`);
+    log(` ChatGPT fallback: Extracted ${messages.length} messages`);
     return messages;
   }
 
@@ -1886,7 +1892,7 @@ export function createMessageExtractor(platform: Platform): MessageExtractor {
 // Debug function to help identify selectors
 export function debugPlatformElements(platform: Platform): void {
   try {
-    console.log(`[ContextDrop] Debugging ${platform}...`);
+    log(` Debugging ${platform}...`);
 
     const config = PLATFORM_CONFIGS[platform];
     if (!config) {

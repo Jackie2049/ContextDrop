@@ -3,7 +3,7 @@ import { detectPlatform, extractSessionId, extractSessionIdFromDOM, createMessag
 import { startBatchCapture, pauseBatchCapture, resumeBatchCapture, cancelBatchCapture, isBatchCaptureRunning, getBatchCaptureProgress, setSelectedSessions } from './batch-capture';
 import type { Platform, Session, Message } from '../types';
 
-const DEBUG = true;  // Enable verbose logging for DeepSeek debugging
+const DEBUG = false;  // Disable verbose logging in production
 
 function log(...args: any[]) {
   if (DEBUG) console.log('[ContextDrop]', ...args);
@@ -50,18 +50,18 @@ function init() {
     // DeepSeek / Doubao 专用调试
     // 启用自动调试日志以帮助诊断问题
     if (currentPlatform === 'deepseek') {
-      console.log('[ContextDrop] === DeepSeek Debug Start ===');
-      console.log('[ContextDrop] URL:', url);
+      if (DEBUG) console.log('[ContextDrop] === DeepSeek Debug Start ===');
+      if (DEBUG) console.log('[ContextDrop] URL:', url);
       setTimeout(() => {
-        debugDeepSeekPage();
+        if (DEBUG) debugDeepSeekPage();
       }, 2000);
     }
 
     if (currentPlatform === 'doubao') {
-      console.log('[ContextDrop] === Doubao Debug Start ===');
-      console.log('[ContextDrop] URL:', url);
+      if (DEBUG) console.log('[ContextDrop] === Doubao Debug Start ===');
+      if (DEBUG) console.log('[ContextDrop] URL:', url);
       setTimeout(() => {
-        debugDoubaoPage();
+        if (DEBUG) debugDoubaoPage();
       }, 3000); // 稍长延迟确保页面完全加载
     }
 
@@ -81,7 +81,7 @@ function init() {
       }, 1000);
     }
 
-    log('Detected:', currentPlatform, 'Session:', currentSessionId);
+    if (DEBUG) log('Detected:', currentPlatform, 'Session:', currentSessionId);
 
     startCapturing();
   } catch (err) {
@@ -294,16 +294,16 @@ window.debugDeepSeekPage = debugDeepSeekPage;
 window.debugDoubaoPage = debugDoubaoPage;
 
 function startCapturing() {
-  log('Starting capture...');
+  if (DEBUG) log('Starting capture...');
 
-  // Initial capture
-  setTimeout(tryCapture, 300);
+  // Initial capture with delay to ensure DOM is ready
+  setTimeout(tryCapture, 500);
 
   // Use MutationObserver for instant response to DOM changes
   observer = new MutationObserver(() => {
     // Debounce: only check after a short delay
     if (pendingSave) clearTimeout(pendingSave);
-    pendingSave = window.setTimeout(tryCapture, 200);
+    pendingSave = window.setTimeout(tryCapture, 300);
   });
 
   observer.observe(document.body, {
@@ -318,12 +318,10 @@ function startCapturing() {
 
 function tryCapture() {
   if (!currentPlatform) {
-    log('tryCapture: no platform detected');
     return;
   }
 
   if (!isExtensionContextValid()) {
-    log('tryCapture: extension context invalid');
     return;
   }
 
@@ -332,7 +330,6 @@ function tryCapture() {
     if (currentPlatform === 'yuanbao') {
       const domSessionId = extractSessionIdFromDOM(currentPlatform);
       if (domSessionId && domSessionId !== currentSessionId) {
-        log('Session ID changed from', currentSessionId, 'to', domSessionId);
         currentSessionId = domSessionId;
         // Reset tracking for new session
         lastMessageCount = 0;
@@ -344,44 +341,44 @@ function tryCapture() {
     const extractor = createMessageExtractor(currentPlatform);
     const messages = extractor.extractMessages();
 
-    // Enhanced logging for debugging
-    log(`tryCapture: extracted ${messages.length} messages from ${currentPlatform}`);
-
     if (messages.length === 0) {
-      log('tryCapture: no messages found - selector may need update');
       return;
     }
 
-    // Fast comparison: count + hash of last message
+    // Fast comparison: count + hash
     const currentHash = hashMessages(messages);
-    if (messages.length !== lastMessageCount || currentHash !== lastMessageHash) {
-      lastMessageCount = messages.length;
-      lastMessageHash = currentHash;
 
-      // Save asynchronously without blocking
-      saveSessionDebounced(messages);
+    // Only save if content actually changed
+    if (messages.length === lastMessageCount && currentHash === lastMessageHash) {
+      return;
     }
+
+    lastMessageCount = messages.length;
+    lastMessageHash = currentHash;
+
+    // Save asynchronously without blocking
+    saveSessionDebounced(messages);
   } catch (err) {
-    console.error('[ContextDrop] tryCapture error:', err);
+    if (DEBUG) console.error('[ContextDrop] tryCapture error:', err);
   }
 }
 
 function saveSessionDebounced(messages: Message[]) {
-  // Debounce saves: wait 500ms before actually saving
+  // Debounce saves: wait 800ms before actually saving
   if (saveTimeout) clearTimeout(saveTimeout);
 
   saveTimeout = window.setTimeout(async () => {
-    // Final check: compare content hash with last saved
+    // Final check: compare content with last saved
     const saveHash = hashMessages(messages);
     const lastSaveHash = hashMessages(lastSavedMessages);
 
     if (saveHash === lastSaveHash && messages.length === lastSavedMessages.length) {
-      return; // No actual change
+      return; // No actual change, skip save
     }
 
     lastSavedMessages = [...messages]; // Copy to avoid reference issues
     await doSave(messages);
-  }, 500);
+  }, 800);
 }
 
 async function doSave(messages: Message[]) {
@@ -393,12 +390,10 @@ async function doSave(messages: Message[]) {
       const domSessionId = extractSessionIdFromDOM(currentPlatform);
       if (domSessionId) {
         currentSessionId = domSessionId;
-        log('Updated session ID from DOM:', currentSessionId);
       }
     }
 
     if (!currentSessionId) {
-      log('No session ID available, skipping save');
       return;
     }
 
@@ -419,9 +414,9 @@ async function doSave(messages: Message[]) {
     };
 
     await sessionStorage.saveSessionOptimized(session);
-    console.log('[ContextDrop] ✓ Saved:', title, `(${messages.length}条消息)`);
+    if (DEBUG) console.log('[ContextDrop] ✓ Saved:', title, `(${messages.length}条消息)`);
   } catch (err: any) {
-    if (!err?.message?.includes('Extension context invalidated')) {
+    if (!err?.message?.includes('Extension context invalidated') && DEBUG) {
       console.error('[ContextDrop] Save failed:', err);
     }
   }
