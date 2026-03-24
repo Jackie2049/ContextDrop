@@ -247,6 +247,49 @@
     </div>
   </div>
 
+  <!-- Inject Preview Dialog -->
+  <div id="inject-preview-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-inject">
+      <div class="dialog-header">
+        <span>注入预览</span>
+        <span id="inject-target-platform" class="inject-target-platform">→ 豆包</span>
+      </div>
+      <div class="dialog-body">
+        <div class="inject-stats">
+          <div class="inject-stat">
+            <span class="stat-label">消息数</span>
+            <span id="inject-message-count" class="stat-value">15 条</span>
+          </div>
+          <div class="inject-stat">
+            <span class="stat-label">字符数</span>
+            <span id="inject-char-count" class="stat-value">3,456</span>
+          </div>
+          <div class="inject-stat">
+            <span class="stat-label">Token数量估计</span>
+            <span id="inject-token-count" class="stat-value">1,234</span>
+          </div>
+        </div>
+        <div id="inject-truncate-section" class="inject-truncate-section" style="display: none;">
+          <div class="truncate-label">
+            <span>⚠️ 内容较长，建议截断</span>
+            <span id="inject-limit-info" class="limit-info">限制: 32K</span>
+          </div>
+          <div class="truncate-slider-wrapper">
+            <label>保留最近：</label>
+            <input type="range" id="inject-message-slider" class="truncate-slider" min="1" max="50" value="20">
+            <span id="inject-slider-value" class="slider-value">20</span> 条
+          </div>
+        </div>
+        <textarea class="inject-preview-content" id="inject-preview-content" placeholder="预览内容..."></textarea>
+      </div>
+      <div class="dialog-footer">
+        <button id="inject-cancel" class="btn btn-secondary">取消</button>
+        <button id="inject-copy-fallback" class="btn btn-secondary">📋 拷贝记忆</button>
+        <button id="inject-confirm" class="btn btn-primary">⚡️ 一键注入</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Onboarding Dialog -->
   <div id="onboarding-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog dialog-onboarding">

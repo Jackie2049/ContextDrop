@@ -2,6 +2,15 @@ import { sessionStorage } from '../storage/session-storage';
 import { tagStorage } from '../storage/tag-storage';
 import { formatSessionForInjection } from '../utils/formatter';
 import { formatPlatformName, detectPlatform } from '../utils/extractor';
+import {
+  estimateTokens,
+  getPlatformTokenLimit,
+  getPlatformDisplayName,
+  formatTokenCount,
+  needsTruncation,
+  findOptimalKeepCount,
+} from '../utils/token-counter';
+import { formatSessionForInject } from '../utils/injector';
 import type { Platform, Session, Tag } from '../types';
 
 // Export data structure
@@ -37,6 +46,14 @@ function getPlatformIcon(platform: Platform | undefined, options: IconOptions = 
     return `<span class="${className}" style="font-size: ${size}px; line-height: ${size}px;${style}">${defaultIcon}</span>`;
   }
   return `<img class="${className} ${platform}" src="${iconUrls[platform]}" width="${size}" height="${size}" alt="${formatPlatformName(platform)}"${style}>`;
+}
+
+// 获取产品logo（粉色大脑）
+function getProductIcon(options: IconOptions = {}): string {
+  const { size = 16, className = 'product-logo', extraStyle = '' } = options;
+  const iconUrl = chrome.runtime.getURL('icons/icon-32.png');
+  const style = extraStyle ? ` style="${extraStyle}"` : '';
+  return `<img class="${className}" src="${iconUrl}" width="${size}" height="${size}" alt="ContextDrop"${style}>`;
 }
 
 const PLATFORM_ICONS: Record<Platform, string> = {
@@ -116,7 +133,6 @@ const batchCancelBtn = document.getElementById('batch-cancel-btn')! as HTMLButto
 
 // Tag dialog elements
 const tagDialog = document.getElementById('tag-dialog')!;
-const tagDialogTitle = document.getElementById('tag-dialog-title')!;
 const tagList = document.getElementById('tag-list')!;
 const tagNewInput = document.getElementById('tag-new-input')! as HTMLInputElement;
 const tagAddBtn = document.getElementById('tag-add-btn')! as HTMLButtonElement;
@@ -142,6 +158,21 @@ const onboardingDialog = document.getElementById('onboarding-dialog')!;
 const onboardingStartBtn = document.getElementById('onboarding-start-btn')! as HTMLButtonElement;
 const dontShowAgainCheckbox = document.getElementById('dont-show-again')! as HTMLInputElement;
 
+// Inject preview dialog elements
+const injectPreviewDialog = document.getElementById('inject-preview-dialog')!;
+const injectTargetPlatform = document.getElementById('inject-target-platform')!;
+const injectTokenCount = document.getElementById('inject-token-count')!;
+const injectMessageCount = document.getElementById('inject-message-count')!;
+const injectCharCount = document.getElementById('inject-char-count')!;
+const injectTruncateSection = document.getElementById('inject-truncate-section')!;
+const injectLimitInfo = document.getElementById('inject-limit-info')!;
+const injectMessageSlider = document.getElementById('inject-message-slider')! as HTMLInputElement;
+const injectSliderValue = document.getElementById('inject-slider-value')!;
+const injectPreviewContent = document.getElementById('inject-preview-content')! as HTMLTextAreaElement;
+const injectCancelBtn = document.getElementById('inject-cancel')! as HTMLButtonElement;
+const injectCopyFallbackBtn = document.getElementById('inject-copy-fallback')! as HTMLButtonElement;
+const injectConfirmBtn = document.getElementById('inject-confirm')! as HTMLButtonElement;
+
 // State
 let currentPlatform: Platform | null = null;
 let allTags: Tag[] = [];
@@ -164,6 +195,12 @@ let captureSelectedIds = new Set<string>();
 
 // Tag dialog state
 let currentTagSessionId: string | null = null;
+
+// Inject preview dialog state
+let currentInjectSession: Session | null = null;
+let currentInjectTargetPlatform: Platform | null = null;
+let currentInjectTabId: number | null = null;
+let currentKeepCount: number = 0;
 
 // Track collapsed state of each platform (persisted in chrome.storage.local)
 const collapsedPlatforms = new Set<string>();
@@ -510,6 +547,15 @@ async function init() {
     if (e.target === sessionViewDialog) hideSessionViewDialog();
   });
 
+  // Inject preview dialog events
+  injectCancelBtn.addEventListener('click', hideInjectPreviewDialog);
+  injectCopyFallbackBtn.addEventListener('click', handleInjectCopyFallback);
+  injectConfirmBtn.addEventListener('click', handleInjectConfirm);
+  injectMessageSlider.addEventListener('input', handleInjectSliderChange);
+  injectPreviewDialog.addEventListener('click', (e) => {
+    if (e.target === injectPreviewDialog) hideInjectPreviewDialog();
+  });
+
   // Listen for batch capture progress from content script
   chrome.runtime.onMessage.addListener((message) => {
     if (message.type === 'BATCH_CAPTURE_PROGRESS') {
@@ -829,10 +875,7 @@ function renderSessionItemWithHighlight(session: Session, tags: Tag[]): string {
   // Hide action buttons in delete mode
   const actionsHtml = isDeleteMode ? '' : `
     <div class="session-actions">
-      <button class="btn-icon copy" title="复制上下文" data-action="copy">📋</button>
-      <button class="btn-icon tag-btn" title="管理标签" data-action="tags">🏷️</button>
-      <button class="btn-icon edit" title="编辑标题" data-action="edit">✏️</button>
-      <button class="btn-icon delete" title="删除" data-action="delete">🗑️</button>
+      <button class="btn-icon inject" title="注入到当前平台" data-action="inject">${getProductIcon({ size: 18 })}</button>
     </div>
   `;
 
@@ -884,46 +927,13 @@ function renderPlatformGroupWithHtml(platform: Platform, sessionHtmls: string[])
 }
 
 function bindSessionEvents() {
-  // Copy buttons
-  document.querySelectorAll('[data-action="copy"]').forEach(btn => {
+  // Inject buttons
+  document.querySelectorAll('[data-action="inject"]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
     const item = (e.target as HTMLElement).closest('.session-item');
     const id = item?.getAttribute('data-id');
     if (id) {
-      await handleCopy(id);
-    }
-  });
-  });
-
-  // Edit buttons
-  document.querySelectorAll('[data-action="edit"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-    const item = (e.target as HTMLElement).closest('.session-item');
-    const id = item?.getAttribute('data-id');
-    if (id) {
-      await handleEdit(id);
-    }
-  });
-  });
-
-  // Tag buttons
-  document.querySelectorAll('[data-action="tags"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-    const item = (e.target as HTMLElement).closest('.session-item');
-    const id = item?.getAttribute('data-id');
-    if (id) {
-      await handleManageTags(id);
-    }
-  });
-  });
-
-  // Delete buttons
-  document.querySelectorAll('[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-    const item = (e.target as HTMLElement).closest('.session-item');
-    const id = item?.getAttribute('data-id');
-    if (id && confirm('确定要删除这个会话吗？')) {
-      await handleDelete(id);
+      await handleInject(id);
     }
   });
   });
@@ -1106,60 +1116,147 @@ async function handleDeleteSelected() {
   showToast(`已删除 ${deleted} 个会话`);
 }
 
-async function handleCopy(sessionId: string) {
+// ========== Inject Preview Dialog ==========
+
+async function handleInject(sessionId: string) {
   const session = await sessionStorage.getSession(sessionId);
   if (!session) {
     showToast('会话不存在');
     return;
   }
 
-  const formatted = formatSessionForInjection(session, 'full');
+  // 检测当前活动标签页
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const targetPlatform = tab?.url ? detectPlatform(tab.url) : null;
+
+  if (!targetPlatform) {
+    showToast('请先打开目标 AI 平台');
+    return;
+  }
+
+  // 计算当前格式化内容的 token 数
+  const formatted = formatSessionForInject(session);
+  const tokenCount = estimateTokens(formatted);
+  const limit = getPlatformTokenLimit(targetPlatform);
+
+  // 保存当前状态
+  currentInjectSession = session;
+  currentInjectTargetPlatform = targetPlatform;
+  currentInjectTabId = tab.id!;
+  currentKeepCount = session.messages.length;
+
+  // 更新对话框内容
+  injectTargetPlatform.textContent = `→ ${getPlatformDisplayName(targetPlatform)}`;
+  injectLimitInfo.textContent = `限制: ${formatTokenCount(limit)}`;
+
+  // 检查是否需要截断
+  const needsTrunc = needsTruncation(tokenCount, limit, 0.8);
+
+  if (needsTrunc) {
+    // 找到最优保留数量
+    const optimalCount = findOptimalKeepCount(session.messages, limit * 0.8, session.title);
+    currentKeepCount = optimalCount;
+
+    // 显示截断选项
+    injectTruncateSection.style.display = 'block';
+    injectMessageSlider.max = String(session.messages.length);
+    injectMessageSlider.value = String(optimalCount);
+    injectSliderValue.textContent = String(optimalCount);
+  } else {
+    injectTruncateSection.style.display = 'none';
+  }
+
+  // 更新预览
+  updateInjectPreview();
+
+  // 显示对话框
+  injectPreviewDialog.style.display = 'flex';
+}
+
+function updateInjectPreview() {
+  if (!currentInjectSession || !currentInjectTargetPlatform) return;
+
+  const formatted = formatSessionForInject(currentInjectSession, currentKeepCount);
+  const tokenCount = estimateTokens(formatted);
+  const limit = getPlatformTokenLimit(currentInjectTargetPlatform);
+
+  // 更新统计
+  injectTokenCount.textContent = formatTokenCount(tokenCount);
+  injectMessageCount.textContent = `${currentKeepCount} 条`;
+  injectCharCount.textContent = formatted.length.toLocaleString();
+
+  // Token 超标时显示警告颜色
+  if (tokenCount > limit) {
+    injectTokenCount.classList.add('token-warning');
+  } else {
+    injectTokenCount.classList.remove('token-warning');
+  }
+
+  // 显示完整内容
+  injectPreviewContent.value = formatted;
+}
+
+function handleInjectSliderChange() {
+  currentKeepCount = parseInt(injectMessageSlider.value, 10);
+  injectSliderValue.textContent = String(currentKeepCount);
+  updateInjectPreview();
+}
+
+function hideInjectPreviewDialog() {
+  injectPreviewDialog.style.display = 'none';
+  currentInjectSession = null;
+  currentInjectTargetPlatform = null;
+  currentInjectTabId = null;
+  currentKeepCount = 0;
+}
+
+async function handleInjectConfirm() {
+  if (!currentInjectSession || !currentInjectTargetPlatform || !currentInjectTabId) {
+    showToast('注入失败：状态错误');
+    return;
+  }
+
+  // 读取用户编辑后的内容
+  const content = injectPreviewContent.value;
 
   try {
-    await navigator.clipboard.writeText(formatted);
-    showToast('已复制到剪贴板！请粘贴到目标AI助手的输入框');
+    const response = await chrome.tabs.sendMessage(currentInjectTabId, {
+      type: 'INJECT_CONTEXT',
+      content: content,
+    });
+
+    if (response?.success) {
+      // 先保存平台名称，因为 hideInjectPreviewDialog 会清空状态
+      const platformName = getPlatformDisplayName(currentInjectTargetPlatform!);
+      hideInjectPreviewDialog();
+      showToast(`已注入到 ${platformName}`);
+    } else {
+      showToast(response?.error || '注入失败');
+    }
   } catch (err) {
-    // Fallback for extension context
+    console.error('[ContextDrop] Inject error:', err);
+    showToast('注入失败：请刷新目标平台页面后重试');
+  }
+}
+
+async function handleInjectCopyFallback() {
+  if (!currentInjectSession) return;
+
+  // 读取用户编辑后的内容
+  const content = injectPreviewContent.value;
+
+  try {
+    await navigator.clipboard.writeText(content);
+    showToast('已复制到剪贴板');
+  } catch (err) {
     const textArea = document.createElement('textarea');
-    textArea.value = formatted;
+    textArea.value = content;
     document.body.appendChild(textArea);
     textArea.select();
     document.execCommand('copy');
     document.body.removeChild(textArea);
-    showToast('已复制到剪贴板！请粘贴到目标AI助手的输入框');
+    showToast('已复制到剪贴板');
   }
-}
-
-async function handleEdit(sessionId: string) {
-  const session = await sessionStorage.getSession(sessionId);
-  if (!session) return;
-
-  const newTitle = prompt('编辑会话标题:', session.title);
-  if (newTitle && newTitle !== session.title) {
-    await sessionStorage.updateSessionTitle(sessionId, newTitle);
-    await loadSessions();
-    showToast('标题已更新');
-  }
-}
-
-async function handleManageTags(sessionId: string) {
-  const session = await sessionStorage.getSession(sessionId);
-  if (!session) return;
-
-  // Set current session info
-  currentTagSessionId = sessionId;
-
-  // Update dialog title
-  tagDialogTitle.textContent = `管理 "${session.title}" 的标签`;
-
-  // Clear input
-  tagNewInput.value = '';
-
-  // Render tag list
-  await renderTagList();
-
-  // Show dialog
-  tagDialog.style.display = 'flex';
 }
 
 async function renderTagList() {
@@ -1268,12 +1365,6 @@ async function handleAddNewTag() {
 function hideTagDialog() {
   tagDialog.style.display = 'none';
   currentTagSessionId = null;
-}
-
-async function handleDelete(sessionId: string) {
-  await sessionStorage.deleteSession(sessionId);
-  await loadSessions();
-  showToast('会话已删除');
 }
 
 async function handleExport() {

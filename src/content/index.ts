@@ -1,6 +1,7 @@
 import { sessionStorage } from '../storage/session-storage';
 import { detectPlatform, extractSessionId, extractSessionIdFromDOM, createMessageExtractor } from '../utils/extractor';
 import { startBatchCapture, pauseBatchCapture, resumeBatchCapture, cancelBatchCapture, isBatchCaptureRunning, getBatchCaptureProgress, setSelectedSessions } from './batch-capture';
+import { injectToInput } from '../utils/injector';
 import type { Platform, Session, Message } from '../types';
 
 const DEBUG = false;  // Disable verbose logging in production
@@ -636,6 +637,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'BATCH_CAPTURE_SELECT_SESSIONS') {
     setSelectedSessions(message.sessionIds || []);
     sendResponse({ success: true });
+    return true;
+  }
+
+  // 处理注入请求
+  if (message.type === 'INJECT_CONTEXT') {
+    if (!currentPlatform) {
+      sendResponse({ success: false, error: '未检测到支持的平台' });
+      return true;
+    }
+
+    const result = injectToInput(message.content, currentPlatform);
+    sendResponse(result);
     return true;
   }
 
