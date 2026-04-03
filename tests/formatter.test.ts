@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { formatSessionForInjection, formatTimestamp, copyToClipboard } from '../src/utils/formatter';
+import { formatSessionForInjection, formatTimestamp } from '../src/utils/formatter';
 import type { Session, Platform } from '../src/types';
 
 describe('formatter', () => {
@@ -113,6 +113,16 @@ describe('formatter', () => {
         }
       });
 
+      it('should handle missing platform gracefully', () => {
+        const noPlatformSession: Session = {
+          ...mockSession,
+          platform: undefined as unknown as Platform,
+        };
+
+        const result = formatSessionForInjection(noPlatformSession, 'full');
+        expect(result).toContain('AI'); // Should use 'AI' as fallback
+      });
+
       it('should include message count', () => {
         const result = formatSessionForInjection(mockSession, 'full');
         expect(result).toContain('消息数: 3');
@@ -218,53 +228,6 @@ describe('formatter', () => {
         expect(result).toContain('First user message');
         expect(result).not.toContain('Second user message');
       });
-    });
-  });
-
-  describe('copyToClipboard', () => {
-    beforeEach(() => {
-      // Mock navigator.clipboard
-      Object.assign(navigator, {
-        clipboard: {
-          writeText: vi.fn(),
-        },
-      });
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('should copy text to clipboard successfully', async () => {
-      vi.mocked(navigator.clipboard.writeText).mockResolvedValueOnce(undefined);
-
-      const result = await copyToClipboard('test content');
-      expect(result).toBe(true);
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('test content');
-    });
-
-    it('should return false when clipboard write fails', async () => {
-      vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error('Clipboard error'));
-
-      const result = await copyToClipboard('test content');
-      expect(result).toBe(false);
-    });
-
-    it('should handle empty string', async () => {
-      vi.mocked(navigator.clipboard.writeText).mockResolvedValueOnce(undefined);
-
-      const result = await copyToClipboard('');
-      expect(result).toBe(true);
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('');
-    });
-
-    it('should handle special characters', async () => {
-      vi.mocked(navigator.clipboard.writeText).mockResolvedValueOnce(undefined);
-
-      const specialContent = '特殊字符 🎉 <script>alert("xss")</script>';
-      const result = await copyToClipboard(specialContent);
-      expect(result).toBe(true);
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(specialContent);
     });
   });
 });

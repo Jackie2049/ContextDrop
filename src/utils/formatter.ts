@@ -50,13 +50,3 @@ ${content}
 基于以上背景，请帮我继续...
 `;
 }
-
-export async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (err) {
-    console.error('Failed to copy:', err);
-    return false;
-  }
-}
